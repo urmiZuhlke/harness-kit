@@ -1,0 +1,26 @@
+name: Kit self-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  kit-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Unit tests (harvester, scorer, injection detection)
+        run: npm test
+
+      - name: Skill frontmatter, manifest versions, parity, rubric weights
+        run: node .github/scripts/kit-check.mjs
+
+      - name: install.mjs dry-run smoke test
+        run: node plugin/scripts/install.mjs --dry-run --target-home /tmp/harness-kit-ci-home

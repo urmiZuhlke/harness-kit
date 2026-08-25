@@ -1,0 +1,56 @@
+# CI — the required merge gate.
+#
+# Place at: .github/workflows/ci.yml
+#
+# Runs on every PR and on push to the default branch. This is the workflow branch
+# protection should require green before merge. No cloud credentials needed.
+#
+# STACK-NEUTRAL TEMPLATE. Replace the {{...}} steps with your project's real commands.
+# The shape is what matters: one required job that lints, type-checks, tests and builds,
+# failing the merge if any step fails. Add a services: block only if your tests need one
+# (a database, a cache); delete the setup step for your language if it doesn't apply.
+
+name: CI
+run-name: 'CI: ${{ github.event.pull_request.title || github.ref_name }}'
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint · types · tests · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      # Replace with the setup action for your language, e.g.
+      #   actions/setup-node · actions/setup-python · actions/setup-java · actions/setup-go
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: '{{INSTALL_COMMAND}}' # e.g. npm ci · pip install -r requirements.txt · go mod download
+
+      - name: Lint
+        run: '{{LINT_COMMAND}}'
+
+      - name: Type check
+        run: '{{TYPECHECK_COMMAND}}' # delete this step if your language has no separate type check
+
+      - name: Test
+        run: '{{TEST_COMMAND}}'
+
+      - name: Build
+        run: '{{BUILD_COMMAND}}'

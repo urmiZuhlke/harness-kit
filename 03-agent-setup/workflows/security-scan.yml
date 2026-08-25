@@ -1,0 +1,49 @@
+# Security scan — secrets and dependency CVEs.
+#
+# Place at: .github/workflows/security-scan.yml
+#
+# Stack-neutral: Trivy scans the filesystem for known-vulnerable dependencies AND for
+# committed secrets, in any language, with no per-ecosystem configuration. That covers
+# the two failure modes that actually matter — a leaked credential and a known-exploited
+# dependency — without a per-stack audit job to maintain.
+#
+# Triggers: every PR to the default branch, plus a nightly run.
+#
+# Allowlist: `.trivyignore` at the repo root is the single source of truth for accepted
+# CVEs. Document why each one is accepted in your decision-records doc.
+
+name: Security scan
+run-name: "Security scan: ${{ github.event.pull_request.title || 'Nightly' }}"
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Trivy (secrets + dependency CVEs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Scan filesystem for secrets and vulnerable dependencies
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '1' # fail the job — this is a required check, not an FYI
+          format: table

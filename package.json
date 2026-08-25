@@ -1,0 +1,16 @@
+{
+  "name": "harness-kit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Workshop kit for building software with AI, and the scorer that grades how it was done.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "check": "npm test && node .github/scripts/kit-check.mjs",
+    "vibecheck": "node bin/vibecheck.mjs",
+    "leaderboard": "node bin/leaderboard.mjs"
+  }
+}

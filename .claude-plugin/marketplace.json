@@ -1,0 +1,26 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "harness-kit",
+  "metadata": {
+    "description": "harness-kit — the workshop agent roster (Planner, Implementer, Reviewer, Explore) and the /harness-kit scaffolding skill, usable from any repository."
+  },
+  "owner": {
+    "name": "harness-kit"
+  },
+  "plugins": [
+    {
+      "name": "harness-kit",
+      "description": "harness-kit — the workshop agent roster (Planner, Implementer, Reviewer, Explore) and the /harness-kit scaffolding skill, usable from any repository.",
+      "version": "1.1.0",
+      "source": "./plugin",
+      "category": "productivity",
+      "tags": [
+        "agentic",
+        "workshop",
+        "scoring",
+        "harness",
+        "agents"
+      ]
+    }
+  ]
+}
