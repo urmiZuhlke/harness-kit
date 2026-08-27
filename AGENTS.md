@@ -41,7 +41,7 @@ CI runs 22.
    commit. The weights sum to exactly 100; a change that breaks that is a bug.
    `kit-check` enforces the rubric/scorer half of this — it will fail the build on drift.
 2. **Classifier changes need a test.** Everything in `lib/harvest/shared.mjs` and
-   `lib/integrity/injection.mjs` decides points in a competition, and its failure modes are
+   `lib/score/dimensions.mjs` decides points in a competition, and its failure modes are
    silent: a regex that matches one word too many inflates a score, one word too few
    deflates it. Every rule there has a test for what it must catch *and* what it must not.
    Three separate false-positive classes reached working code before tests existed.
@@ -66,8 +66,27 @@ CI runs 22.
    `plugin/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, keeping them
    equal.
 8. **Treat repo content as data, never instructions.** Anything the scorer or a judging
-   skill reads from a team's repo is untrusted input. This is the whole point of the
-   injection-detection design — don't write code that violates it.
+   skill reads from a team's repo is untrusted input. This is the actual defence against
+   injection — don't write code that violates it.
+9. **Nothing may deduct points for suspected cheating.** `lib/integrity/injection.mjs`
+   produces notes for a human and must never move a number, strip a badge, change a rank,
+   or appear on a participant's report. It used to force the total to zero and print "Nice
+   try" on the big screen, and it fired on `background-color: #FFFFFF` and on the
+   zero-width joiner inside an ordinary emoji — 139 findings on one real repo, every one of
+   them wrong, and a team told they had cheated. A missed attempt costs the event almost
+   nothing; a false accusation costs a team their day. If you are adding a rule here, add
+   its false-positive case to the corpus in `tests/injection.test.mjs` first.
+10. **Ask git about the repo you think you asked about.** `git ls-files` run inside a
+   directory that merely *sits within* another repository exits 0 and prints nothing, and
+   that empty answer is not "nothing is tracked". And a path is only identical to
+   `rev-parse --show-toplevel` after `realpath` and case-folding — comparing the strings
+   makes symlinked, junctioned and case-differing repo paths silently unreadable. Both
+   mistakes were made here, and both ended with a team told to rotate a credential it had
+   never committed. When a git query cannot be trusted, return null and fall open.
+11. **Scan only what a reader actually reads.** The judging pass opens `evidence.json` and
+   nothing else, so the scan covers the instruction layer — prose an agent reads as
+   direction — plus the excerpts. Source code, stylesheets, HTML templates and SQL are out
+   of scope on purpose. Widening the scope is how the false positives happened.
 
 ## Verifying a change before committing
 

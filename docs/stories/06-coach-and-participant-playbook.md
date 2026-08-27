@@ -27,8 +27,9 @@ warning that the scorer is adversarially tested.
   rubric weighted to reward real verification loops, optimising toward it is the workshop.
   _(Alternative considered: withholding the weights to prevent gaming — rejected because
   it converts a teaching tool into a trap and produces scores nobody can learn from.)_
-- **The injection penalty is announced, not sprung**: a published dare is fun and teaches
-  the concept; an unannounced one just feels unfair.
+- **The injection dare is announced, not sprung**: a published dare is fun and teaches the
+  concept; an unannounced one just feels unfair. It carries no penalty — a false accusation
+  costs a team far more than a missed attempt costs the event.
 - **An intervention ladder rather than a rule**: the most valuable coaching moment is a
   team discovering their agent lied to them about tests passing, and a coach who answers
   too early destroys it.
@@ -48,8 +49,9 @@ warning that the scorer is adversarially tested.
   with their weights, and how the final score is produced.
 - State in participant material that transcripts are read locally for scoring, what is
   extracted, and what is never copied.
-- State in participant material that attempts to instruct the scorer are detected,
-  penalised with a zero, and shown publicly.
+- State in participant material that attempts to instruct the scorer are detected, that a
+  detection costs no points and is never shown publicly, and that what it produces is a
+  note for a coach to read.
 - Provide a starting tips list covering what to set up first and what earns the most
   points.
 - Warn coaches that running the scorer against a team's repo executes that repo's test
@@ -68,8 +70,8 @@ warning that the scorer is adversarially tested.
 - [x] Verify the intro outline's section timings sum to 30 minutes.
 - [x] Verify the consent notice states what is read, what is extracted and what is never
       copied.
-- [x] Verify the participant one-pager describes the injection penalty before the event
-      rather than after.
+- [x] Verify the participant one-pager describes the injection scan, and that it costs no
+      points, before the event rather than after.
 - [x] Verify the field guide names at least one failure mode per dimension.
 - [x] Verify the field guide states that scoring executes the team's test command, and
       names the flag that avoids it.

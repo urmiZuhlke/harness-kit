@@ -21,6 +21,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DIMENSIONS } from '../../lib/score/dimensions.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -174,6 +175,25 @@ function checkRubricWeights() {
       + `lib/score/dimensions.mjs has [${b}] — update both.`);
   } else {
     console.log(`Rubric weights match and sum to 100: [${rubricWeights.join(', ')}]`);
+    // The participant docs state the criterion count in prose, and the report computes it.
+    // Nothing but this stops the two drifting the next time a criterion is added.
+    const criterionCount = DIMENSIONS.reduce((n, d) => n + d.criteria.length, 0);
+    for (const doc of ['docs/rubric.md', 'docs/participant-one-pager.md']) {
+      const text = readFileSync(join(ROOT, doc), 'utf8');
+      const stated = [...text.matchAll(/\b(?:all )?(\d+) criteria\b/gi)];
+      // Zero matches is indistinguishable from agreement, so a reword would disable this
+      // check with no failure — and this loop is the only thing between the docs and drift.
+      if (!stated.length) {
+        fail(`${doc} no longer states the criterion count as "N criteria" — restore it, `
+          + 'or update this check to match the new phrasing.');
+      }
+      for (const m of stated) {
+        if (Number(m[1]) !== criterionCount) {
+          fail(`${doc} says "${m[0]}" but the scorer has ${criterionCount} — update both.`);
+        }
+      }
+    }
+    console.log(`Criterion count consistent across docs and scorer: ${criterionCount}`);
   }
 }
 

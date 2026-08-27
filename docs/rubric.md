@@ -10,6 +10,11 @@ Run it on yourself any time:
 node bin/vibecheck.mjs
 ```
 
+The report it writes lists **every one of the 19 criteria** — the ones you passed as well
+as the ones you didn't — and each reads the same three ways: what we looked for, what we
+found, and what to do about it. This page is the summary; the report is the detail, and it
+is generated from the same file the scorer uses, so the two cannot drift apart.
+
 | # | Dimension | Points | Measured by |
 | - | --------- | -----: | ----------- |
 | 1 | Working Method | 25 | your AI chat transcripts |
@@ -89,15 +94,24 @@ inputs to your score. We are measuring engineering leverage, not consumption. A 
 ships a working, well-verified feature in forty focused prompts beats a team that burned
 four hundred.
 
-## A warning, offered in good faith
+## The injection dare
 
-The scorer is adversarially tested, and the repo is scanned for attempts to instruct it —
-hidden text, invisible characters, notes addressed to whatever is reading your files,
-anything referencing the scorer by name.
+The scorer is adversarially tested, and the prose an agent reads as instructions —
+`AGENTS.md`, `CLAUDE.md`, your README and docs, editor rule files, and the prompt excerpts
+in your evidence file — is scanned for attempts to instruct it: hidden text, invisible
+characters, notes addressed to whatever is reading your files, anything referencing the
+scorer by name while trying to direct it.
 
-Try it and you will score **zero**, and we will put it on the big screen with your name on
-it and the exact line quoted.
+**Finding one does not cost you points.** It never has to: repo text is treated as data
+everywhere in this kit, never as instructions, so an attempt has nothing to act on. What
+the scan produces is a note for a coach, who reads it and decides whether it means
+anything. Your source code, stylesheets, templates and SQL are not scanned at all.
 
-We mention this in advance because it is a dare, not a trap. Prompt injection is a real
-vulnerability class and you are about to see it from both sides. If you find a way through
-and *tell us* instead of using it, there is a badge in it for you.
+This is a dare, not a trap. Prompt injection is a real vulnerability class and you are
+about to see it from both sides. If you find a way through and *tell us* instead of using
+it, there is a badge in it for you.
+
+We used to zero a team's score automatically on any hit. We stopped, because the scan
+misfired: an ordinary emoji and a white background in an HTML email were both read as
+concealed text. Being wrongly told you cheated is a far worse outcome than a clumsy
+attempt going unpunished, so no automatic penalty exists any more.

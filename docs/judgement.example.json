@@ -3,7 +3,7 @@
 
   "schemaVersion": 1,
   "model": "claude-opus-5",
-  "promptVersion": "1.0.0",
+  "promptVersion": "1.1.0",
   "judgedAt": "2026-08-22T09:15:00.000Z",
 
   "criteria": {

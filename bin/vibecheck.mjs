@@ -27,7 +27,7 @@ const OUTPUT_DIR = '.vibecheck';
 function parseArgs(argv) {
   const args = {
     repo: process.cwd(), runTestSuite: true, testTimeoutMs: 120000,
-    quiet: false, harvestOnly: false,
+    quiet: false, harvestOnly: false, explainIntegrity: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -36,6 +36,7 @@ function parseArgs(argv) {
     else if (arg === '--test-timeout') args.testTimeoutMs = Number(argv[++i]) * 1000;
     else if (arg === '--harvest-only') args.harvestOnly = true;
     else if (arg === '--quiet') args.quiet = true;
+    else if (arg === '--explain-integrity') args.explainIntegrity = true;
     else if (arg === '-h' || arg === '--help') args.help = true;
     else {
       console.error('Unknown option: ' + arg);
@@ -60,6 +61,7 @@ Options:
   --test-timeout <secs>  Timeout for the test run (default: 120)
   --harvest-only         Collect evidence without scoring it
   --quiet                Only print the output paths
+  --explain-integrity    List exactly which files the injection scan read
   -h, --help             Show this help
 
 Privacy: transcripts are read locally, only aggregate metrics and short excerpts are
@@ -124,8 +126,17 @@ if (!args.quiet) {
   console.log('  fail -> pass loops ' + t.failThenPassSequences);
   console.log('  corrections        ' + t.corrections);
   console.log('  commits            ' + (evidence.gitEvidence.commitCount ?? 'n/a'));
-  const secrets = evidence.repoEvidence.safety?.secretFindings?.offered ?? 0;
-  console.log('  secret findings    ' + secrets + (secrets ? '   <-- look at these' : ''));
+  // All three counters, because printing only the scored one said "secret findings 0" to
+  // a team with two credentials sitting in gitignored files. They cost no points, and they
+  // are still worth knowing about.
+  const safety = evidence.repoEvidence.safety ?? {};
+  const secrets = safety.secretFindings?.offered ?? 0;
+  const notScored = [
+    (safety.localCredentials?.offered ?? 0) ? safety.localCredentials.offered + ' local-only' : null,
+    (safety.untrackedCredentials?.offered ?? 0) ? safety.untrackedCredentials.offered + ' untracked' : null,
+  ].filter(Boolean);
+  console.log('  secret findings    ' + secrets + (secrets ? '   <-- look at these' : '')
+    + (notScored.length ? '   (plus ' + notScored.join(', ') + ' — not scored)' : ''));
 
   if (evidence.noChatEvidence) {
     console.log('\n  No AI chat transcripts could be read for this repo. The dimensions that');
@@ -153,23 +164,6 @@ const reportFile = join(outDir, 'report.html');
 writeFileSync(reportFile, renderReport(result, evidence), 'utf8');
 
 if (!args.quiet) {
-  if (result.integrity.penalised) {
-    console.log('  ' + '='.repeat(62));
-    console.log('   NICE TRY.');
-    console.log('');
-    console.log('   This repo contains an attempt to instruct the scorer. That is an');
-    console.log('   automatic zero, and it gets shown on the big screen.');
-    console.log('');
-    for (const f of result.integrity.deliberate.slice(0, 5)) {
-      console.log('     ' + f.file + ':' + f.line + '  (' + f.label + ')');
-      console.log('       ' + f.text);
-    }
-    console.log('');
-    console.log('   Without the penalty this would have scored '
-      + result.integrity.wouldHaveScored + '/100.');
-    console.log('  ' + '='.repeat(62) + '\n');
-  }
-
   console.log('Score: ' + result.total + '/100'
     + (result.complete ? '' : '   (' + result.available + ' points assessable so far)')
     + (result.provisional ? '   PROVISIONAL' : ''));
@@ -199,11 +193,26 @@ if (!args.quiet) {
     }
   }
 
-  if (result.integrity.ambiguous.length) {
-    console.log('\nFlagged for a coach to look at (no penalty applied):');
-    for (const f of result.integrity.ambiguous.slice(0, 3)) {
+  // Notes, not deductions. Phrased so nobody reads a regex hit as an accusation: these
+  // change no number, and a human decides whether they mean anything at all.
+  const notes = [...result.coachNotes.strong, ...result.coachNotes.weak];
+  if (notes.length) {
+    console.log('\nWorth a second look (this changes nothing about your score):');
+    for (const f of notes.slice(0, 5)) {
       console.log('  ' + f.file + ':' + f.line + '  ' + f.label);
     }
+    if (notes.length > 5) {
+      console.log('  ...and ' + (notes.length - 5) + ' more in ' + OUTPUT_DIR + '/score.json');
+    }
+  }
+
+  if (args.explainIntegrity) {
+    const sc = result.coachNotes.scanned;
+    console.log('\nInjection scan scope: ' + (sc?.scope ?? 'not run'));
+    console.log('  files scanned: ' + (sc?.filesScanned ?? 0)
+      + (sc?.kitFilesSkipped ? ', kit files skipped: ' + sc.kitFilesSkipped : ''));
+    for (const f of sc?.surfaces ?? []) console.log('    ' + f);
+    if (sc?.surfacesTruncated) console.log('    ...more not listed');
   }
   console.log('');
 }

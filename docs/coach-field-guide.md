@@ -64,9 +64,41 @@ read the same evidence differently; that variance is expected, but same-model co
 are much stronger. Agree this before you start — the `model` field in `judgement.json` is
 self-reported and not reliable enough to reconstruct afterwards.
 
+## If the scan flags something
+
+`vibecheck` reads the prose an agent would read as instructions — `AGENTS.md`, `CLAUDE.md`,
+the README, docs — looking for text that tries to instruct the scorer. When it finds
+something, it prints it under **"Worth a second look"** in the terminal, and that is all it
+does.
+
+**It costs no points, and it never reaches the team's report or the leaderboard page.** It
+is not published anywhere and no score moves — but it is not secret from the team either:
+they see the same line if they run `vibecheck` themselves, which the one-pager tells them
+to do. That is deliberate. What it means is your call, not the tool's.
+
+- **Almost every hit is innocent.** An earlier version of this kit zeroed a team's score
+  automatically and put it on the big screen. It fired 139 times on one real repo — on the
+  emoji in a database migration, on the white background of an HTML email template, and on
+  a third-party skill the team had installed but not written. Every single one was wrong.
+- **Read the quoted line before saying anything to anyone.** `node bin/vibecheck.mjs
+  --explain-integrity` shows exactly which files were scanned, so you can check the scan
+  looked where you expected.
+- **If it is genuine**, it is a conversation, not a sanction: they tried a real technique,
+  and the interesting part is showing them why it did not work. Repo text is treated as
+  data everywhere in this kit, so an attempt has nothing to act on. The Responsible
+  Disclosure badge exists for a team that finds a way through and tells you.
+- **Never accuse a team on a regex alone.** A false accusation costs them their day; a
+  missed attempt costs the event almost nothing.
+
+**One thing to expect:** a team that squashes its history to a handful of commits will see
+"Context & Harness" score out of 15 rather than 20. There is no commit ordering left to
+read, so "was the harness written first?" goes unscored rather than failed. That is
+deliberate — guessing would mean telling a team something false — and because ranking uses
+share of assessable points, it costs them nothing.
+
 ## When a team finishes early
 
-Point them at the lost-points list in their own `report.html` — it's usually not "add
+Point them at the "What to do next" list in their own `report.html` — it's usually not "add
 more features," it's "close the loop you left open" (a test that was never re-run, a
 harness note that's gone stale). If everything's genuinely closed, harder verification
 (an edge case they haven't handled) is a better use of remaining time than more surface
@@ -74,6 +106,8 @@ area.
 
 ## A note on trust
 
-Scoring executes the team's own test command. Run `vibecheck` **on the team's machine,
-with the team present** — never point it at a repo you don't know from your own laptop.
-`node bin/vibecheck.mjs --no-run-tests` skips execution if you're unsure.
+Scoring executes the team's own test command, discovered from their `package.json`,
+`Makefile` or language manifest. Run `vibecheck` **on the team's machine, with the team
+present** — never point it at a repo you don't know from your own laptop.
+`node bin/vibecheck.mjs --no-run-tests` skips execution if you're unsure; the criterion
+then reports as unscored rather than failed, so nobody loses points for your caution.

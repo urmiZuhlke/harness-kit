@@ -20,7 +20,8 @@ per dimension, and for every point lost a plain-language reason with the evidenc
 caused it. The deterministic dimensions are computed from evidence alone, so a coach
 re-running the scorer on the same evidence gets the same number. Teams can run it
 themselves any time as practice, with coach-judged dimensions clearly marked provisional.
-Repos containing deliberate attempts to instruct the scorer score zero and are flagged.
+Repos containing text that reads like an attempt to instruct the scorer are flagged for a
+coach, with no effect on the score.
 
 ## Decisions & Rationale
 
@@ -63,10 +64,12 @@ Repos containing deliberate attempts to instruct the scorer score zero and are f
 - Detect deliberate attempts to influence a scoring agent, covering concealed instructions,
   references to the scorer's own filenames or output keys, and imperatives addressed at an
   evaluator.
-- Detect ambiguous self-promotional content separately and flag it for a coach decision
-  without applying a penalty.
-- Set the final score to zero when a deliberate attempt is detected, and record the
-  offending file, line and quoted text.
+- Detect ambiguous self-promotional content separately, at a lower confidence tier.
+- Record the file, line and quoted text of every detection as a note for a coach.
+  **Superseded:** this story originally set the final score to zero on a detection. It no
+  longer does, and nothing in the scorer may. The rules misfired on ordinary emoji and
+  ordinary CSS and told a team it had cheated; a false accusation costs far more than a
+  missed attempt. See rule 9 in `AGENTS.md`.
 - Treat all repo and transcript content as data throughout, never as instructions to the
   scorer or to any downstream consumer of its output.
 - Provide a practice mode teams can run repeatedly, marking coach-judged dimensions as
@@ -85,9 +88,9 @@ Repos containing deliberate attempts to instruct the scorer score zero and are f
 - [x] Given evidence where the Copilot source is `not-harvested`, when the scorer runs,
       then the affected dimension is reported partial and the total is labelled accordingly.
 - [x] Given a repo file containing a zero-width-character-concealed instruction, when the
-      scorer runs, then the final score is zero and the detection cites file, line and text.
+      scorer runs, then the detection cites file, line and text — and the score is unchanged.
 - [x] Given an `AGENTS.md` that legitimately contains the phrase "you are a reviewer", when
-      the scorer runs, then no deliberate-tier penalty is applied.
+      the scorer runs, then no high-confidence detection is recorded.
 - [ ] Given a repo whose harness files were committed after the bulk of the code, when the
       scorer runs, then the Context and Harness dimension reflects the timestamp evidence.
 - [x] Verify every deduction in `score.json` carries both a reason and an evidence citation.
@@ -131,7 +134,8 @@ Repos containing deliberate attempts to instruct the scorer score zero and are f
 **Out of scope:**
 
 - The LLM judging pass for subjective dimensions — story 4.
-- Any visual presentation of the score or the injection penalty — story 5.
+- Any visual presentation of the score — story 5. The injection scan has no visual
+  presentation at all; its output reaches a coach through the CLI.
 - Cryptographic signing of evidence files; integrity here rests on recomputation plus
   coach spot-checks, which is proportionate for a friendly camp.
 

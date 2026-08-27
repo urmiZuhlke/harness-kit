@@ -119,10 +119,9 @@ for (const candidate of candidates) {
  */
 const share = (r) => (r.available > 0 ? r.total / r.available : 0);
 
-const clean = rows.filter((r) => !r.result.integrity.penalised)
+const clean = [...rows]
   .sort((a, b) => share(b.result) - share(a.result)
     || (b.result.badges?.length ?? 0) - (a.result.badges?.length ?? 0));
-const penalised = rows.filter((r) => r.result.integrity.penalised);
 // `incomplete` — points that could never be assessed (an unreadable AI tool). Permanent.
 // `pending`    — judgements and demo scores a coach still owes. Actionable right now.
 /**
@@ -154,7 +153,7 @@ function describeAwaiting(item) {
     : item.dimension + ' (' + item.needs + ')';
 }
 
-const DIMS = clean[0]?.result.dimensions ?? penalised[0]?.result.dimensions ?? [];
+const DIMS = clean[0]?.result.dimensions ?? [];
 const shortLabel = (d) => d.label.split(/[\s&]+/)[0].slice(0, 6);
 
 console.log('\nLEADERBOARD   (scorer ' + SCORER_VERSION + ', ' + rows.length + ' team(s))\n');
@@ -171,7 +170,7 @@ clean.forEach((row, i) => {
     r.complete ? null : 'incomplete',
     r.provisional ? 'provisional' : null,
     r.badges?.length ? r.badges.length + ' badge(s)' : null,
-    r.integrity.ambiguous.length ? 'review' : null,
+    r.coachNotes.strong.length + r.coachNotes.weak.length ? 'has notes' : null,
   ].filter(Boolean).join(', ');
   console.log('  ' + String(i + 1).padStart(2) + ' ' + row.team.slice(0, 21).padEnd(22)
     + String(r.total).padStart(4) + '  ' + String(r.available).padStart(4) + '  ' + cells
@@ -200,16 +199,31 @@ if (incomplete.length) {
   }
 }
 
-if (penalised.length) {
-  console.log('\n  NICE TRY  — caught instructing the scorer. Automatic zero.\n');
-  for (const row of penalised) {
-    const first = row.result.integrity.deliberate[0];
-    console.log('     ' + row.team.slice(0, 21).padEnd(22) + '  0    '
-      + '(would have scored ' + row.result.integrity.wouldHaveScored + ')');
-    console.log('       ' + first.file + ':' + first.line + '  ' + first.label);
+// Notes from the injection scan. They deduct nothing and rank nobody — a coach reads them
+// and decides what, if anything, they mean. Listed last so they never colour how the
+// table above is read.
+// A bundle whose repo is not on this machine had only its evidence excerpts scanned. Say
+// so, or "no notes" reads as an all-clear nobody actually earned.
+// `scanned` is null when the bundle carried no repo path at all, which is the same silence
+// this block exists to break — so both cases count as unscanned.
+const unscanned = clean.filter((r) => !r.result.coachNotes.scanned
+  || r.result.coachNotes.scanned.repoScanned === false);
+if (unscanned.length) {
+  console.log('\n  Repo files not scanned for ' + unscanned.length + ' team(s) — their repo');
+  console.log('  is not on this machine, so only the evidence excerpts were read:');
+  for (const row of unscanned) console.log('    ' + row.team.slice(0, 21));
+}
+
+const withNotes = clean.filter((r) => r.result.coachNotes.strong.length);
+if (withNotes.length) {
+  console.log('\n  Worth a second look (no points affected, no conclusion drawn):\n');
+  for (const row of withNotes) {
+    const first = row.result.coachNotes.strong[0];
+    console.log('     ' + row.team.slice(0, 21).padEnd(22)
+      + first.file + ':' + first.line + '  ' + first.label);
     console.log('       ' + first.text.slice(0, 100));
-    if (row.result.integrity.deliberate.length > 1) {
-      console.log('       ...and ' + (row.result.integrity.deliberate.length - 1) + ' more');
+    if (row.result.coachNotes.strong.length > 1) {
+      console.log('       ...and ' + (row.result.coachNotes.strong.length - 1) + ' more');
     }
   }
 }
@@ -240,7 +254,7 @@ if (args.out) {
   writeFileSync(resolve(args.out), JSON.stringify({
     scorerVersion: SCORER_VERSION,
     rankedAt: new Date().toISOString(),
-    teams: [...clean, ...penalised].map((r) => ({ team: r.team, bundle: r.bundle, score: r.result })),
+    teams: clean.map((r) => ({ team: r.team, bundle: r.bundle, score: r.result })),
     skipped,
   }, null, 2) + '\n', 'utf8');
   console.log('Wrote ' + resolve(args.out) + '\n');
@@ -249,7 +263,7 @@ if (args.out) {
 if (args.html) {
   const target = resolve(args.html);
   writeFileSync(target, renderLeaderboard(
-    [...clean, ...penalised].map((r) => ({ team: r.team, score: r.result, evidence: r.evidence })),
+    clean.map((r) => ({ team: r.team, score: r.result, evidence: r.evidence })),
     { scorerVersion: SCORER_VERSION }
   ), 'utf8');
   console.log('Wrote ' + target);

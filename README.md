@@ -5,7 +5,8 @@ well you did it.
 
 Teams get harness templates and the scoring rubric on day one. At the end, one command
 turns their repo, their git history and their AI chat transcripts into a score out of 100,
-with every lost point explained.
+listing every criterion — passed and failed alike — with what was looked for, what was
+found, and what to do about it.
 
 ## For teams
 

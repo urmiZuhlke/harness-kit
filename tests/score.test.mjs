@@ -55,6 +55,23 @@ function evidenceFixture(overrides = {}) {
   return { ...base, ...overrides };
 }
 
+test('every criterion says what it looked for, and it reaches score.json', () => {
+  // `lookedFor` was added to all 19 criteria by script, which is the change most likely to
+  // go silently wrong — and a criterion that cannot say what it measured is the whole
+  // complaint this field exists to answer.
+  for (const d of DIMENSIONS) {
+    for (const c of d.criteria) {
+      assert.ok(typeof c.lookedFor === 'string' && c.lookedFor.length > 30,
+        `${c.id} has no usable lookedFor`);
+    }
+  }
+  const scored = score(evidenceFixture()).dimensions.flatMap((d) => d.criteria);
+  assert.equal(scored.length, DIMENSIONS.reduce((n, d) => n + d.criteria.length, 0));
+  for (const c of scored) {
+    assert.ok(c.lookedFor, `${c.id} lost its lookedFor on the way into score.json`);
+  }
+});
+
 test('the rubric weights sum to exactly 100', () => {
   const total = DIMENSIONS.reduce((sum, d) => sum + d.points, 0);
   assert.equal(total, 100);
@@ -193,13 +210,65 @@ test('skipping the test run is not scored as having no tests', () => {
   assert.equal(dim.available, 17, 'the 8 unrunnable points leave the denominator');
 });
 
-test('genuinely having no test command still fails', () => {
+test('genuinely having no tests at all still fails', () => {
   const ev = evidenceFixture();
-  ev.repoEvidence.tests.run = { ran: false, reason: 'no test command detected' };
+  ev.repoEvidence.tests = { testFileCount: 0, run: { ran: false, reason: 'no test command detected' } };
+  ev.chat.totals.testRuns = { total: 0, pass: 0, fail: 0, unknown: 0 };
   const green = score(ev).dimensions.find((d) => d.id === 'verification-loop')
     .criteria.find((c) => c.id === 'suite-runs-green');
   assert.equal(green.status, 'fail');
   assert.equal(green.earned, 0);
+});
+
+test('the scorer failing to find the command is not the team failing to have tests', () => {
+  // A real repo was credited 6/6 for running its tests throughout the build and told two
+  // rows later that "an agent that cannot run your tests cannot check its own work" — the
+  // scorer simply could not parse `test-lambdas:` out of the Makefile. Contradicting
+  // another criterion on the same page is a bug, not a score.
+  const ev = evidenceFixture();
+  ev.repoEvidence.tests = { testFileCount: 84, run: { ran: false, reason: 'no test command detected' } };
+  ev.chat.totals.testRuns = { total: 12, pass: 10, fail: 2, unknown: 0 };
+  const dim = score(ev).dimensions.find((d) => d.id === 'verification-loop');
+  const green = dim.criteria.find((c) => c.id === 'suite-runs-green');
+  assert.equal(green.status, 'not-harvested');
+  assert.equal(dim.available, 17, 'the 8 unscorable points left the denominator');
+  assert.match(green.lostBecause, /transcripts show tests running 12 time/);
+});
+
+test('test files with no transcript evidence are still not scored as a red suite', () => {
+  const ev = evidenceFixture();
+  ev.repoEvidence.tests = { testFileCount: 40, run: { ran: false, reason: 'no test command detected' } };
+  ev.chat.totals.testRuns = { total: 0, pass: 0, fail: 0, unknown: 0 };
+  const green = score(ev).dimensions.find((d) => d.id === 'verification-loop')
+    .criteria.find((c) => c.id === 'suite-runs-green');
+  assert.equal(green.status, 'not-harvested');
+  assert.match(green.lostBecause, /40 test file\(s\) are here/);
+});
+
+test('a suite that could not start is unassessable, not red', () => {
+  // Detecting more commands means occasionally picking one this machine cannot run.
+  // Scoring that as "red at hand-in" would be the same false negative in a new costume.
+  const ev = evidenceFixture();
+  ev.repoEvidence.tests.run = {
+    ran: true, command: 'npm test', exitCode: 1, durationMs: 400,
+    couldNotStart: true, couldNotStartWhy: 'a dependency is not installed',
+  };
+  const green = score(ev).dimensions.find((d) => d.id === 'verification-loop')
+    .criteria.find((c) => c.id === 'suite-runs-green');
+  assert.equal(green.status, 'not-harvested');
+  assert.equal(green.earned, 0);
+  assert.match(green.lostBecause, /dependency is not installed/);
+});
+
+test('a suite that ran and failed is still scored as red', () => {
+  const ev = evidenceFixture();
+  ev.repoEvidence.tests.run = {
+    ran: true, command: 'npm test', exitCode: 1, durationMs: 4000, couldNotStart: false,
+  };
+  const green = score(ev).dimensions.find((d) => d.id === 'verification-loop')
+    .criteria.find((c) => c.id === 'suite-runs-green');
+  assert.equal(green.status, 'partial');
+  assert.equal(green.earned, 3);
 });
 
 test('a truncated file scan cannot award full secrets marks', () => {

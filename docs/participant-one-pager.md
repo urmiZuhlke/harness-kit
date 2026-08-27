@@ -35,8 +35,10 @@ node bin/vibecheck.mjs
 ```
 
 This reads your repo, your git history, and your AI chat transcripts — **on your own
-machine, locally** — and writes `.vibecheck/report.html` with your score, broken down by
-dimension, with every lost point explained.
+machine, locally** — and writes `.vibecheck/report.html`: your score, what you did well,
+what to do next ranked by what it's worth, and then all 19 criteria in full. Each one tells
+you the same three things — what we looked for, what we found, and what to do about it —
+whether you scored full marks on it or nothing at all.
 
 This is **practice mode**. Dimension 6 ("It Actually Works") stays unscored until a coach
 watches your demo. Everything else is real, live, and yours to act on all day.
@@ -58,17 +60,31 @@ independently — editing your own `score.json` changes nothing.
   transcript. Plus the first ~4,000 characters of your harness files (`AGENTS.md` and
   friends), with anything that looks like a credential automatically replaced by
   `[redacted]` before it's written.
-- **Never copied:** full conversations, the contents of your source files, anything from
-  outside the repo you're scoring.
+- **Also recorded:** the file and line of anything that looks like a credential —
+  locations only, never the value itself; the names on your commits; the path to your repo
+  on this machine and your branch names; the names of the tools your agent called; and up
+  to 4,000 characters of whatever your test command last printed, with credential-shaped
+  strings replaced by `[redacted]`.
+- **About that test output:** a failing suite often prints file paths and the lines of code
+  around the failure, so we can't promise no source code ever appears there. Read it
+  yourself in `evidence.json` if that matters to you.
+- **Never copied:** full conversations, your source files wholesale, anything from outside
+  the repo you're scoring.
 
 `evidence.json` is yours — open it and read exactly what was collected about you.
 
 **One thing does leave your machine.** Two of the 100 points' worth of criteria — is your
 harness substantive, did your prompts show real decomposition — are judged by a coach
-running an AI judging pass. That sends the excerpts described above (prompt excerpts and
-redacted harness content, nothing else) to an AI model, the same way any AI tool you used
-today sent your prompts to one. The rest of the scoring is a local script and stays local.
-If that matters to you, tell a coach and they'll score those two criteria by hand instead.
+running an AI judging pass. **That step sends your whole `evidence.json`** to an AI model:
+everything listed above — prompt excerpts, your instruction and context files with
+credentials redacted, credential locations, committer names, your repo path and branch
+names, the tool names your agent called, filenames and counts, and your last test run's
+output. The whole of that one file, not a selection from it. It is a plain
+JSON file sitting in your repo, so open it before you agree: what you read there is exactly
+what gets sent.
+
+The rest of the scoring is a local script and stays local. If any of that matters to you,
+tell a coach and they'll score those two criteria by hand instead.
 
 If your AI tool isn't one we can read (only Claude Code and Copilot are supported today),
 run `/journal` at milestones — it's your fallback and it's a genuinely useful habit
@@ -76,12 +92,15 @@ either way.
 
 ## A warning, in good faith
 
-The scorer is adversarially tested. We scan repos for attempts to instruct it — hidden
-text, invisible characters, notes addressed to whatever is reading your files, anything
-that mentions the scorer by name while trying to direct it.
+The scorer is adversarially tested. We scan the prose an agent reads as instructions —
+`AGENTS.md`, `CLAUDE.md`, your README and docs, editor rule files, and the prompt excerpts
+in your evidence file — for attempts to instruct it: hidden text, invisible characters,
+notes addressed to whatever is reading your files. Your source code, stylesheets,
+templates and SQL are not scanned.
 
-**Try it and you score zero, and it goes on the big screen with your name on it and the
-exact line quoted.**
+**Finding one costs you nothing.** Repo text is treated as data everywhere in this kit and
+never as instructions, so an attempt has nothing to act on. The scan writes a note for a
+coach, who decides whether it means anything at all. No score moves on its own.
 
 We're telling you this now because it's a dare, not a trap. Prompt injection is a real
 vulnerability class, and you're about to see it from both sides. Find a way through and

@@ -10,7 +10,7 @@ budget, not a script.
 | 3 | The rubric | 8 | Walk the six dimensions and their weights from [`docs/rubric.md`](rubric.md). Say plainly: this is the whole rubric, nothing is added later, optimise for it freely. |
 | 4 | How scoring works | 5 | Live-demo `node bin/vibecheck.mjs` against a throwaway repo. Show the `report.html` output. Explain practice mode and the mid-point checkpoint. |
 | 5 | Privacy | 3 | What's read, what's extracted, what's never copied — from the one-pager. Say it out loud, don't just point at the doc. |
-| 6 | The injection dare | 3 | Announce the scorer is adversarially tested. Show what a caught attempt looks like (a screenshot or the live demo repo, penalised). Frame it as a dare, not a trap — and mention the reporting badge. |
+| 6 | The injection dare | 3 | Announce the scorer is adversarially tested. Show what a caught attempt looks like on the live demo repo — a note for a coach, with the score unchanged. Say plainly that nothing here deducts points automatically, and why. Frame it as a dare, not a trap — and mention the reporting badge. |
 | 7 | Logistics & starting tips | 3 | Coach assignments, checkpoint times, where to find help, the five starting tips from the one-pager. |
 | | **Total** | **30** | |
 
@@ -18,7 +18,7 @@ budget, not a script.
 
 - **Sections 3, 5 and 6 must happen before anyone opens an editor.** These are exactly the
   three things participant material states must be known up front: the weights, the
-  privacy notice, and the injection penalty. Don't compress them to make room elsewhere —
+  privacy notice, and the injection dare. Don't compress them to make room elsewhere —
   cut section 7's detail instead and put it in writing.
 - **Section 4's live demo is worth protecting.** Watching a real `report.html` render
   teaches the shape of the day faster than describing it. If time is short, pre-record it
