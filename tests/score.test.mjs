@@ -121,16 +121,18 @@ test('transcript-only criteria drop out when there are no transcripts', () => {
   const r = score(ev);
   const working = r.dimensions.find((d) => d.id === 'working-method');
 
-  // The journal is the documented fallback, so planning stays assessable while the three
-  // transcript-only criteria leave the denominator entirely.
+  // The journal is the documented fallback, so planning and the end-to-end trace stay
+  // assessable while the three transcript-only criteria leave the denominator entirely.
   const byId = Object.fromEntries(working.criteria.map((c) => [c.id, c]));
   for (const id of ['iterative-direction', 'prompts-carry-context', 'course-correction']) {
     assert.equal(byId[id].status, 'not-harvested', `${id} should be unassessable`);
     assert.equal(byId[id].earned, 0);
   }
   assert.notEqual(byId['planned-before-building'].status, 'not-harvested');
+  assert.notEqual(byId['end-to-end-trace'].status, 'not-harvested',
+    'the journal describes the loop even when no transcript can be read');
   assert.equal(working.status, 'partial');
-  assert.equal(working.available, 5);
+  assert.equal(working.available, 8, 'planning (4) and the end-to-end trace (4) remain');
   assert.ok(r.available < 100);
   assert.equal(r.complete, false);
   // Deliberately not asserting `provisional` here: it now means "a human owes an action",
@@ -161,16 +163,16 @@ test('a criterion that throws costs points instead of shrinking the denominator'
   for (const c of repro.criteria) assert.equal(c.status, 'error');
 });
 
-test('the demo dimension stays unassessed until a coach scores it', () => {
+test('the demo dimension stays unassessed until a facilitator scores it', () => {
   const r = score(evidenceFixture());
   const demo = r.dimensions.find((d) => d.id === 'it-actually-works');
   assert.equal(demo.status, 'not-harvested');
   assert.equal(demo.available, 0);
 });
 
-test('a coach scorecard supplies the demo score and badges', () => {
+test('a facilitator scorecard supplies the demo score and badges', () => {
   const r = score(evidenceFixture(), {
-    coachScorecard: { demo: { points: 8, note: 'one edge case crashes' }, badges: ['zero-secrets'] },
+    facilitatorScorecard: { demo: { points: 8, note: 'one edge case crashes' }, badges: ['zero-secrets'] },
   });
   const demo = r.dimensions.find((d) => d.id === 'it-actually-works');
   assert.equal(demo.earned, 8);
@@ -179,20 +181,20 @@ test('a coach scorecard supplies the demo score and badges', () => {
 });
 
 test('a demo score outside 0..10 is clamped', () => {
-  const high = score(evidenceFixture(), { coachScorecard: { demo: { points: 99 } } });
+  const high = score(evidenceFixture(), { facilitatorScorecard: { demo: { points: 99 } } });
   assert.equal(high.dimensions.find((d) => d.id === 'it-actually-works').earned, 10);
-  const low = score(evidenceFixture(), { coachScorecard: { demo: { points: -5 } } });
+  const low = score(evidenceFixture(), { facilitatorScorecard: { demo: { points: -5 } } });
   assert.equal(low.dimensions.find((d) => d.id === 'it-actually-works').earned, 0);
 });
 
 test('a manual adjustment applies only with a written reason', () => {
   const withReason = score(evidenceFixture(), {
-    coachScorecard: { adjustment: { points: -3, reason: 'committed a vendored tree' } },
+    facilitatorScorecard: { adjustment: { points: -3, reason: 'committed a vendored tree' } },
   });
   assert.equal(withReason.adjustment.applied, true);
   assert.equal(withReason.total, withReason.earned - 3);
 
-  const without = score(evidenceFixture(), { coachScorecard: { adjustment: { points: 20 } } });
+  const without = score(evidenceFixture(), { facilitatorScorecard: { adjustment: { points: 20 } } });
   assert.equal(without.adjustment.applied, false);
   assert.ok(without.adjustment.rejected);
   assert.equal(without.total, without.earned);
@@ -200,14 +202,14 @@ test('a manual adjustment applies only with a written reason', () => {
 
 test('skipping the test run is not scored as having no tests', () => {
   // --no-run-tests is the operator's choice. Treating it as "no test command" would
-  // deduct 8 points for how the scorer was invoked, not for anything the team did.
+  // deduct 7 points for how the scorer was invoked, not for anything the team did.
   const ev = evidenceFixture();
   ev.repoEvidence.tests.run = { ran: false, reason: 'skipped by flag' };
   const r = score(ev);
   const dim = r.dimensions.find((d) => d.id === 'verification-loop');
   const green = dim.criteria.find((c) => c.id === 'suite-runs-green');
   assert.equal(green.status, 'not-harvested');
-  assert.equal(dim.available, 17, 'the 8 unrunnable points leave the denominator');
+  assert.equal(dim.available, 13, 'the 7 unrunnable points leave the denominator');
 });
 
 test('genuinely having no tests at all still fails', () => {
@@ -231,7 +233,7 @@ test('the scorer failing to find the command is not the team failing to have tes
   const dim = score(ev).dimensions.find((d) => d.id === 'verification-loop');
   const green = dim.criteria.find((c) => c.id === 'suite-runs-green');
   assert.equal(green.status, 'not-harvested');
-  assert.equal(dim.available, 17, 'the 8 unscorable points left the denominator');
+  assert.equal(dim.available, 13, 'the 7 unscorable points left the denominator');
   assert.match(green.lostBecause, /transcripts show tests running 12 time/);
 });
 
@@ -278,7 +280,9 @@ test('a truncated file scan cannot award full secrets marks', () => {
   const safety = r.dimensions.find((d) => d.id === 'safety-and-boundaries');
   const secrets = safety.criteria.find((c) => c.id === 'no-secrets');
   assert.equal(secrets.status, 'not-harvested');
-  assert.equal(safety.available, 5, 'the unscannable 5 points must leave the denominator');
+  // 10 less the 4 unscannable secrets points, less the 2 the facilitator has not yet
+  // recorded a sample-data check for.
+  assert.equal(safety.available, 4, 'the unscannable points must leave the denominator');
 });
 
 test('committed secrets fail outright and name the location', () => {

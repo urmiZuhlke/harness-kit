@@ -1,6 +1,6 @@
-# Coach field guide
+# Facilitator field guide
 
-One page. Print it, or keep it open on your phone. It exists so five coaches give the
+One page. Print it, or keep it open on your phone. It exists so five facilitators give the
 same guidance to ten-plus teams — not so you read it once and forget it.
 
 ## The two-minute card
@@ -36,24 +36,24 @@ told them tests passed when they didn't. Don't take that moment away from them.
 
 ## Checkpoint cadence
 
-Sized for **two teams per coach** across an 8–16 hour day. Five coaches, ten teams.
+Sized for **two teams per facilitator** across an 8–16 hour day. Five facilitators, ten teams.
 
 - **Every ~90 minutes**, a short pass: one lap of your two teams, two minutes each,
   intervention ladder above.
 - **Mid-point**: every team runs `node bin/vibecheck.mjs` in practice mode. Read their
-  output over their shoulder — it's the single best coaching moment of the day, because
+  output over their shoulder — it's the single best facilitatoring moment of the day, because
   they can still act on what it tells them.
 - **Last 90 minutes**: stop new features. Push toward a working demo and a green suite.
   A team polishing `AGENTS.md` with an hour left is optimising the wrong thing.
 - **Demo time**: watch it run. Score `it-actually-works` (0–10) into their
-  `coach-scorecard.json` ([template](coach-scorecard.template.json)). Award any badges.
+  `facilitator-scorecard.json` ([template](facilitator-scorecard.template.json)). Award any badges.
 
-More than ten teams? Pair coaches on adjacent tables rather than each stretching thinner —
-a coach actually present for four teams beats one nominally covering eight.
+More than ten teams? Pair facilitators on adjacent tables rather than each stretching thinner —
+a facilitator actually present for four teams beats one nominally covering eight.
 
 ## Judging the two criteria a script can't
 
-Run `/coach-judge` on a team's `.vibecheck` bundle once they have transcripts and a
+Run `/facilitator-judge` on a team's `.vibecheck` bundle once they have transcripts and a
 harness file — no need to wait for demo time. It reads only their `evidence.json`, never
 their repo, and writes `judgement.json` beside it
 ([example](judgement.example.json)). Until judged, those two criteria score from a

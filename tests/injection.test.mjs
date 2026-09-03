@@ -283,7 +283,7 @@ test('a repo that is present says so', () => {
   assert.equal(r.scanned.repoScanned, true);
 });
 
-test('the walk is bounded, so a huge tree cannot stall a coach', () => {
+test('the walk is bounded, so a huge tree cannot stall a facilitator', () => {
   const files = {};
   for (let i = 0; i < 60; i++) files['docs/f' + i + '.md'] = 'text\n';
   const dir = repoWith(files);
@@ -294,7 +294,7 @@ test('the walk is bounded, so a huge tree cannot stall a coach', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('the scan reports what it read, so a coach can challenge the scope', () => {
+test('the scan reports what it read, so a facilitator can challenge the scope', () => {
   const r = scan({ 'README.md': 'clean\n', 'src/app.js': 'const x = 1;\n' });
   assert.equal(r.scanned.filesScanned, 1);
   assert.deepEqual(r.scanned.surfaces, ['README.md']);

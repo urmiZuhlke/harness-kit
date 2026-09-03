@@ -10,7 +10,7 @@ Run it on yourself any time:
 node bin/vibecheck.mjs
 ```
 
-The report it writes lists **every one of the 19 criteria** — the ones you passed as well
+The report it writes lists **every one of the 23 criteria** — the ones you passed as well
 as the ones you didn't — and each reads the same three ways: what we looked for, what we
 found, and what to do about it. This page is the summary; the report is the detail, and it
 is generated from the same file the scorer uses, so the two cannot drift apart.
@@ -18,11 +18,30 @@ is generated from the same file the scorer uses, so the two cannot drift apart.
 | # | Dimension | Points | Measured by |
 | - | --------- | -----: | ----------- |
 | 1 | Working Method | 25 | your AI chat transcripts |
-| 2 | Verification Loop | 25 | transcripts + your test suite |
-| 3 | Context & Harness | 20 | your repo + git timestamps |
-| 4 | Safety & Boundaries | 10 | your repo |
+| 2 | Verification Loop | 20 | transcripts + your test suite |
+| 3 | Context & Understanding | 20 | your repo + git timestamps |
+| 4 | Safety, Privacy & Boundaries | 10 | your repo, plus one facilitator check |
 | 5 | Reproducibility & Handover | 10 | your repo |
-| 6 | It Actually Works | 10 | a coach, watching your demo |
+| 6 | It Actually Works | 15 | a facilitator, watching your demo |
+
+## If you are a team of more than one
+
+Your AI transcripts live in your own home directory, so a check run on one laptop measures
+one person. **Every member harvests, then you merge:**
+
+```bash
+node bin/vibecheck.mjs --harvest-only          # each member, in the team's repo
+node bin/merge-evidence.mjs --dir collected --out team/evidence.json
+node bin/vibecheck.mjs --evidence team/evidence.json
+```
+
+The merge unions everyone's sessions and recalculates every total from them. Skip it and
+four fifths of your team's work is invisible to the score.
+
+**Transcripts can be read from Claude Code, GitHub Copilot in VS Code, Codex CLI and
+Cursor.** Using something else costs you nothing directly — those criteria are reported as
+unassessed rather than failed, and ranking uses your share of assessable points — but you
+also get no feedback on them, so run `/journal` at milestones instead.
 
 ---
 
@@ -30,49 +49,60 @@ is generated from the same file the scorer uses, so the two cannot drift apart.
 
 Did you direct the AI, or did you hope?
 
-*8 of these 25 points — whether your prompts show real goal decomposition — get a
-coach's read via `/coach-judge`, not just a script. Until judged, a deterministic proxy
-stands in and your score stays provisional.*
+*7 of these 25 points — whether your prompts show real goal decomposition — get a
+facilitator's read via `/facilitator-judge`, not just a script. Until judged, a
+deterministic proxy stands in and your score stays provisional.*
 
 **Earns points:** small explicit goals instead of "build the whole app"; a plan agreed
 before code was written; you making the design decisions and delegating the execution;
 catching the agent when it went wrong and correcting course; prompts that carry the
-context needed to answer them.
+context needed to answer them; **at least one piece of work traceable end to end** — a
+goal set, the agent doing the work, the result verified, and you stepping back in.
 
 **Scores zero:** one enormous prompt and whatever came back; accepting every suggestion
 without reading it; no evidence you ever redirected the agent.
 
-## 2. Verification Loop — 25 points
+## 2. Verification Loop — 20 points
 
-The heaviest dimension, deliberately. This is the line between engineering and hoping.
+The line between engineering and hoping.
 
 **Earns points:** tests that exist and actually execute; the agent running them rather
 than claiming success; failures followed by a fix and a re-run; success defined before
 implementation rather than declared after it.
 
 **Scores zero:** no runnable tests; "done" claimed with nothing behind it; a red suite at
-the end of the day.
+the end.
 
-## 3. Context & Harness — 20 points
+## 3. Context & Understanding — 20 points
 
-What did you give the agent to work with?
+What did you give the agent to work with — about how to work here, and about the problem
+itself?
 
-*6 of these 20 points — whether your harness is substantive or boilerplate — also get a
-coach's read via `/coach-judge`, the same way.*
+*11 of these 20 points — whether your harness is substantive, and whether your context
+documents record the real problem — get a facilitator's read via `/facilitator-judge`, the
+same way.*
 
 **Earns points:** an `AGENTS.md` or equivalent holding *your* project's real rules,
-commands and constraints; path-scoped instructions where they earn their place; the
-harness existing **before** the bulk of the code, which we check by timestamp.
+commands and constraints; **a context document recording what the product is for and the
+rules of its domain** — what must never happen, which decisions are already settled;
+path-scoped instructions where they earn their place; the harness existing **before** the
+bulk of the code, which we check by timestamp.
 
-**Scores zero:** no instruction file; an unmodified template; generic advice a good model
-already follows; a harness committed in the last hour to look good.
+**Scores zero:** no instruction file; nothing written down about the problem itself; an
+unmodified template; generic advice a good model already follows; a harness committed in
+the last hour to look good.
 
-## 4. Safety & Boundaries — 10 points
+## 4. Safety, Privacy & Boundaries — 10 points
 
 **Earns points:** no secrets in tracked files; `.env` handled properly; sensible tool
-permissions; destructive commands not blanket-approved.
+permissions; destructive commands not blanket-approved; seed and test data that is
+invented rather than lifted from somewhere real.
 
 **Scores zero:** a committed API key.
+
+*The sample-data check is made by a facilitator looking, never by a scan. An invented
+`ana@example.com` and a real colleague's address are the same string shape, and no regex
+should be allowed to accuse you of the difference.*
 
 ## 5. Reproducibility & Handover — 10 points
 
@@ -81,18 +111,26 @@ new teammate or a new agent could pick this up cold.
 
 **Scores zero:** it only runs on the laptop that built it.
 
-## 6. It Actually Works — 10 points
+## 6. It Actually Works — 15 points
 
-A coach watches your demo and decides. Process without a product is not the goal.
+A facilitator watches your demo and decides — 10 points on the whole thing working, and 5
+scored against **the acceptance checklist for this event**, which you get on day one along
+with this page. Process without a product is not the goal.
 
 ---
 
 ## What we do not reward
 
-**Token volume. Lines of code. Number of commits. Hours logged.** None of these are
-inputs to your score. We are measuring engineering leverage, not consumption. A team that
-ships a working, well-verified feature in forty focused prompts beats a team that burned
-four hundred.
+**Token volume. Lines of code. Number of commits. Hours logged. Team size.** None of these
+are inputs to your score. We are measuring engineering leverage, not consumption. A team
+that ships a working, well-verified feature in forty focused prompts beats a team that
+burned four hundred.
+
+That last one is worth spelling out, because several criteria count things — corrections,
+test runs, closed failures. **They scale with how much work your evidence shows.** Two
+corrections is real steering across forty prompts and barely a gesture across four
+hundred, so the bar rises with the volume. It never falls below what a single person's day
+is held to, so being a small team costs you nothing.
 
 ## The injection dare
 
@@ -104,7 +142,7 @@ scorer by name while trying to direct it.
 
 **Finding one does not cost you points.** It never has to: repo text is treated as data
 everywhere in this kit, never as instructions, so an attempt has nothing to act on. What
-the scan produces is a note for a coach, who reads it and decides whether it means
+the scan produces is a note for a facilitator, who reads it and decides whether it means
 anything. Your source code, stylesheets, templates and SQL are not scanned at all.
 
 This is a dare, not a trap. Prompt injection is a real vulnerability class and you are

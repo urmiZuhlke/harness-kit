@@ -1,6 +1,6 @@
 /**
- * The coach judging pass (story 4): a judgement.json can override two specific
- * criteria — harness-is-substantive, iterative-direction — while everything else stays
+ * The facilitator judging pass (story 4): a judgement.json can override the criteria in
+ * JUDGED_CRITERIA — harness substance, goal decomposition, domain context — while the rest stays
  * exactly as story 3 built it. The stakes here are the same as everywhere else in
  * scoring: a malformed or absent judgement must never crash, never zero a team, and
  * never be treated as a confirmed verdict when it isn't one.
@@ -58,6 +58,7 @@ function judgementFixture(overrides = {}) {
     criteria: {
       'harness-is-substantive': { points: 5, justification: 'Names the real stack and two project-specific rules.' },
       'iterative-direction': { points: 7, justification: 'Second prompt narrowed the first into a scoped ask.' },
+      'domain-context-captured': { points: 6, justification: 'Names the booking rules and the release deadline.' },
     },
     ...overrides,
   };
@@ -116,14 +117,18 @@ test('without a judgement, the overall score is provisional even though every di
 });
 
 test('a full judgement resolves provisional to false, once the demo is also scored', () => {
-  // Isolate the variable under test: without a coachScorecard, the demo dimension is its
-  // own, separate source of "provisional" (awaiting a coach), which would otherwise mask
+  // Isolate the variable under test: without a facilitatorScorecard, the demo dimension is its
+  // own, separate source of "provisional" (awaiting a facilitator), which would otherwise mask
   // whether the judgement alone did its job.
   const r = score(evidenceFixture(), {
     judgement: judgementFixture(),
-    coachScorecard: { demo: { points: 9 } },
+    facilitatorScorecard: {
+      demo: { points: 9 },
+      acceptance: [{ id: 'book-a-desk', met: true }],
+      privacy: { met: true },
+    },
   });
-  assert.equal(r.provisional, false);
+  assert.equal(r.provisional, false, JSON.stringify(r.awaiting));
 });
 
 test('judging only one of the two criteria leaves the other on its fallback', () => {
@@ -160,7 +165,7 @@ test('an out-of-range judged score is clamped, not rejected', () => {
   });
   const decomposition = r.dimensions.find((d) => d.id === 'working-method')
     .criteria.find((c) => c.id === 'iterative-direction');
-  assert.equal(decomposition.earned, 8, 'clamped to the criterion max, not left at 999');
+  assert.equal(decomposition.earned, 7, 'clamped to the criterion max, not left at 999');
 });
 
 test('a completely garbage judgement.json does not crash scoring', () => {
@@ -183,8 +188,8 @@ test('an injection attempt is recorded as a note and changes no number', () => {
     const ev = evidenceFixture({ repo: { path: dir, name: 'attacker' } });
     const flagged = score(ev, { repoPath: dir, kitRoot: KIT_ROOT, judgement: judgementFixture() });
     const clean = score(ev, { judgement: judgementFixture() });
-    assert.equal(flagged.coachNotes.strong.length, 1, 'the attempt went unrecorded');
-    assert.equal(flagged.coachNotes.strong[0].rule, 'evaluator-imperative');
+    assert.equal(flagged.facilitatorNotes.strong.length, 1, 'the attempt went unrecorded');
+    assert.equal(flagged.facilitatorNotes.strong[0].rule, 'evaluator-imperative');
     assert.equal(flagged.total, clean.total, 'a note moved the score');
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -241,12 +246,12 @@ test('judged points are rounded to whole numbers', () => {
   // rubric that promises whole points out of 100.
   const r = score(evidenceFixture(), {
     judgement: judgementFixture({
-      criteria: { 'harness-is-substantive': { points: 5.7, justification: 'x' } },
+      criteria: { 'harness-is-substantive': { points: 4.6, justification: 'x' } },
     }),
   });
   const c = r.dimensions.find((d) => d.id === 'context-and-harness')
     .criteria.find((x) => x.id === 'harness-is-substantive');
-  assert.equal(c.earned, 6);
+  assert.equal(c.earned, 5);
   assert.ok(Number.isInteger(r.total), 'total must be a whole number, got ' + r.total);
   assert.ok(Number.isInteger(r.earned));
 });
@@ -267,23 +272,30 @@ test('a judgement key that names no real criterion is reported, not silently dro
 test('an unjudgeable criterion does not strand a team as permanently provisional', () => {
   // No readable transcripts means there are no prompts to assess, so iterative-direction
   // can never be judged. Before the fix this kept `provisional` true forever, with no
-  // action any coach could take to clear it before ranking.
+  // action any facilitator could take to clear it before ranking.
   const ev = evidenceFixture({ noChatEvidence: true });
   const r = score(ev, {
     judgement: judgementFixture({
-      criteria: { 'harness-is-substantive': { points: 6, justification: 'real and specific' } },
+      criteria: {
+        'harness-is-substantive': { points: 5, justification: 'real and specific' },
+        'domain-context-captured': { points: 6, justification: 'the domain rules are written down' },
+      },
     }),
-    coachScorecard: { demo: { points: 10 } },
+    facilitatorScorecard: {
+      demo: { points: 10 },
+      acceptance: [{ id: 'book-a-desk', met: true }],
+      privacy: { met: true },
+    },
   });
   const it = r.dimensions.find((d) => d.id === 'working-method')
     .criteria.find((c) => c.id === 'iterative-direction');
   assert.equal(it.status, 'not-harvested');
-  assert.equal(r.provisional, false, 'a coach judged everything judgeable; nothing is left to do');
+  assert.equal(r.provisional, false, 'a facilitator judged everything judgeable; nothing is left to do');
 });
 
 test('a criterion still awaiting a judgement keeps the score provisional', () => {
   // The counterpart to the test above: judgeable-but-unjudged must still block.
-  const r = score(evidenceFixture(), { coachScorecard: { demo: { points: 10 } } });
+  const r = score(evidenceFixture(), { facilitatorScorecard: { demo: { points: 10 } } });
   const it = r.dimensions.find((d) => d.id === 'working-method')
     .criteria.find((c) => c.id === 'iterative-direction');
   assert.equal(it.status, 'pass');
@@ -294,11 +306,18 @@ test('a criterion still awaiting a judgement keeps the score provisional', () =>
 test('the score names exactly what a human still owes', () => {
   const nothingDone = score(evidenceFixture());
   const needs = nothingDone.awaiting.map((a) => a.needs);
-  assert.ok(needs.includes('a coach’s score'), 'the demo is unscored');
-  assert.ok(needs.includes('a coach’s judgement'), 'two criteria are unjudged');
+  assert.ok(needs.includes('a facilitator’s score'), 'the demo is unscored');
+  assert.ok(needs.includes('a facilitator’s judgement'), 'two criteria are unjudged');
 
+  // Everything a person owes: the two judged criteria, the demo, the acceptance
+  // checklist and the sample-data privacy check.
   const allDone = score(evidenceFixture(), {
-    judgement: judgementFixture(), coachScorecard: { demo: { points: 9 } },
+    judgement: judgementFixture(),
+    facilitatorScorecard: {
+      demo: { points: 9 },
+      acceptance: [{ id: 'book-a-desk', met: true }],
+      privacy: { met: true },
+    },
   });
   assert.deepEqual(allDone.awaiting, []);
   assert.equal(allDone.provisional, false);
@@ -309,9 +328,16 @@ test('an unassessable dimension is reported by `complete`, not by `provisional`'
   // limitation, `provisional: true` is a pending human action.
   const r = score(evidenceFixture({ noChatEvidence: true }), {
     judgement: judgementFixture({
-      criteria: { 'harness-is-substantive': { points: 6, justification: 'real' } },
+      criteria: {
+        'harness-is-substantive': { points: 5, justification: 'real' },
+        'domain-context-captured': { points: 6, justification: 'the domain rules are written down' },
+      },
     }),
-    coachScorecard: { demo: { points: 8 } },
+    facilitatorScorecard: {
+      demo: { points: 8 },
+      acceptance: [{ id: 'book-a-desk', met: true }],
+      privacy: { met: true },
+    },
   });
   assert.equal(r.complete, false, 'points were genuinely unassessable');
   assert.equal(r.provisional, false, 'but nobody owes an action');

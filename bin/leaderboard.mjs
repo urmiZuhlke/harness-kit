@@ -2,7 +2,7 @@
 /**
  * leaderboard — rank every team from their collected bundles.
  *
- * This is the coach-side command and the authoritative one. It **recomputes** each score
+ * This is the facilitator-side command and the authoritative one. It **recomputes** each score
  * from `evidence.json` and ignores whatever `score.json` a bundle contains, so a team that
  * hand-edits their own score changes nothing. Every team is scored by this one build of
  * the scorer, which is what makes the ranking defensible.
@@ -11,8 +11,8 @@
  *   node bin/leaderboard.mjs --dir bundles         # or a parent holding them all
  *
  * A bundle is a directory containing `evidence.json`, optionally alongside
- * `coach-scorecard.json` (demo score, badges, manual adjustment) and `judgement.json`
- * (a coach judging pass's verdict on the subjective criteria — see plugin/skills/coach-judge).
+ * `facilitator-scorecard.json` (demo score, badges, manual adjustment) and `judgement.json`
+ * (a facilitator judging pass's verdict on the subjective criteria — see plugin/skills/facilitator-judge).
  */
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -43,8 +43,8 @@ bundle is ignored — the evidence is the source of truth.
 
 A bundle directory contains:
   evidence.json          produced by vibecheck on the team's machine   (required)
-  coach-scorecard.json   demo score, badges, manual adjustment          (optional)
-  judgement.json         verdict from the coach-judge skill             (optional)
+  facilitator-scorecard.json   demo score, badges, manual adjustment          (optional)
+  judgement.json         verdict from the facilitator-judge skill             (optional)
 
 Options:
   --dir <parent>   Treat every subdirectory of <parent> as a bundle
@@ -91,11 +91,11 @@ for (const candidate of candidates) {
   const evidence = loadJson(join(bundle, 'evidence.json'));
   if (!evidence) { skipped.push({ path: candidate, why: 'evidence.json is unreadable' }); continue; }
 
-  const scorecard = loadJson(join(bundle, 'coach-scorecard.json'));
+  const scorecard = loadJson(join(bundle, 'facilitator-scorecard.json'));
   const judgement = loadJson(join(bundle, 'judgement.json'));
   // Recompute. Any score.json sitting in this bundle is deliberately not read.
   const result = score(evidence, {
-    coachScorecard: scorecard,
+    facilitatorScorecard: scorecard,
     judgement,
     repoPath: evidence?.repo?.path,
     kitRoot: KIT_ROOT,
@@ -123,9 +123,9 @@ const clean = [...rows]
   .sort((a, b) => share(b.result) - share(a.result)
     || (b.result.badges?.length ?? 0) - (a.result.badges?.length ?? 0));
 // `incomplete` — points that could never be assessed (an unreadable AI tool). Permanent.
-// `pending`    — judgements and demo scores a coach still owes. Actionable right now.
+// `pending`    — judgements and demo scores a facilitator still owes. Actionable right now.
 /**
- * Dimensions something could not be measured for, excluding ones simply awaiting a coach.
+ * Dimensions something could not be measured for, excluding ones simply awaiting a facilitator.
  *
  * Each is reported with the reason the criterion itself gave, because "unassessed" covers
  * two different situations and only the criterion knows which: a permanently unreadable
@@ -134,7 +134,7 @@ const clean = [...rows]
  * the time.
  */
 const unassessable = (r) => r.dimensions
-  .filter((d) => d.status !== 'assessed' && !d.coachScored)
+  .filter((d) => d.status !== 'assessed' && !d.facilitatorScored)
   .map((d) => {
     const why = d.criteria.find((c) => c.status === 'not-harvested' && c.lostBecause)?.lostBecause;
     return d.label + (why ? ' — ' + why : '');
@@ -142,11 +142,11 @@ const unassessable = (r) => r.dimensions
 
 // A team is only listed as `incomplete` when something was genuinely unreadable. A score
 // that is merely missing its demo points is *pending*, not incomplete — listing it here
-// would tell a coach "no action will change this" about work they are about to do.
+// would tell a facilitator "no action will change this" about work they are about to do.
 const incomplete = clean.filter((r) => unassessable(r.result).length > 0);
 const pending = clean.filter((r) => (r.result.awaiting?.length ?? 0) > 0);
 
-/** One short phrase naming an outstanding coach action. */
+/** One short phrase naming an outstanding facilitator action. */
 function describeAwaiting(item) {
   return item.criterion
     ? item.criterion + ' (' + item.needs + ')'
@@ -170,7 +170,7 @@ clean.forEach((row, i) => {
     r.complete ? null : 'incomplete',
     r.provisional ? 'provisional' : null,
     r.badges?.length ? r.badges.length + ' badge(s)' : null,
-    r.coachNotes.strong.length + r.coachNotes.weak.length ? 'has notes' : null,
+    r.facilitatorNotes.strong.length + r.facilitatorNotes.weak.length ? 'has notes' : null,
   ].filter(Boolean).join(', ');
   console.log('  ' + String(i + 1).padStart(2) + ' ' + row.team.slice(0, 21).padEnd(22)
     + String(r.total).padStart(4) + '  ' + String(r.available).padStart(4) + '  ' + cells
@@ -178,10 +178,10 @@ clean.forEach((row, i) => {
 });
 
 // Two different states, deliberately reported separately. Conflating them used to tell a
-// coach to "resolve" dimensions that were unassessable — work nobody could do — while
+// facilitator to "resolve" dimensions that were unassessable — work nobody could do — while
 // staying silent about the judgements and demo scores actually outstanding.
 if (pending.length) {
-  console.log('\n  BEFORE DECLARING A WINNER — still waiting on a coach:');
+  console.log('\n  BEFORE DECLARING A WINNER — still waiting on a facilitator:');
   for (const row of pending) {
     console.log('    ' + row.team.slice(0, 21).padEnd(22)
       + row.result.awaiting.map(describeAwaiting).join('; '));
@@ -199,31 +199,31 @@ if (incomplete.length) {
   }
 }
 
-// Notes from the injection scan. They deduct nothing and rank nobody — a coach reads them
+// Notes from the injection scan. They deduct nothing and rank nobody — a facilitator reads them
 // and decides what, if anything, they mean. Listed last so they never colour how the
 // table above is read.
 // A bundle whose repo is not on this machine had only its evidence excerpts scanned. Say
 // so, or "no notes" reads as an all-clear nobody actually earned.
 // `scanned` is null when the bundle carried no repo path at all, which is the same silence
 // this block exists to break — so both cases count as unscanned.
-const unscanned = clean.filter((r) => !r.result.coachNotes.scanned
-  || r.result.coachNotes.scanned.repoScanned === false);
+const unscanned = clean.filter((r) => !r.result.facilitatorNotes.scanned
+  || r.result.facilitatorNotes.scanned.repoScanned === false);
 if (unscanned.length) {
   console.log('\n  Repo files not scanned for ' + unscanned.length + ' team(s) — their repo');
   console.log('  is not on this machine, so only the evidence excerpts were read:');
   for (const row of unscanned) console.log('    ' + row.team.slice(0, 21));
 }
 
-const withNotes = clean.filter((r) => r.result.coachNotes.strong.length);
+const withNotes = clean.filter((r) => r.result.facilitatorNotes.strong.length);
 if (withNotes.length) {
   console.log('\n  Worth a second look (no points affected, no conclusion drawn):\n');
   for (const row of withNotes) {
-    const first = row.result.coachNotes.strong[0];
+    const first = row.result.facilitatorNotes.strong[0];
     console.log('     ' + row.team.slice(0, 21).padEnd(22)
       + first.file + ':' + first.line + '  ' + first.label);
     console.log('       ' + first.text.slice(0, 100));
-    if (row.result.coachNotes.strong.length > 1) {
-      console.log('       ...and ' + (row.result.coachNotes.strong.length - 1) + ' more');
+    if (row.result.facilitatorNotes.strong.length > 1) {
+      console.log('       ...and ' + (row.result.facilitatorNotes.strong.length - 1) + ' more');
     }
   }
 }

@@ -3,7 +3,7 @@
  * vibecheck — harvest the evidence for a team's repo.
  *
  * Run this on the machine the team actually worked on: AI chat transcripts live in the
- * user's home directory, not in the repo, so a coach running it elsewhere would see the
+ * user's home directory, not in the repo, so a facilitator running it elsewhere would see the
  * files but none of the process. Scoring is a separate step that reads the evidence file
  * this produces, so it can run anywhere.
  *
@@ -55,8 +55,8 @@ function help() {
 Harvests how this repo was built with AI, then scores it out of 100 against the rubric in
 docs/rubric.md. Writes ${OUTPUT_DIR}/evidence.json and ${OUTPUT_DIR}/score.json.
 
-Run it as often as you like — this is practice mode. Coach-judged dimensions are marked
-provisional until a coach scores your demo, and nothing else changes between now and then.
+Run it as often as you like — this is practice mode. Facilitator-judged dimensions are marked
+provisional until a facilitator scores your demo, and nothing else changes between now and then.
 
 Options:
   --repo <path>          Repository to check (default: current directory)
@@ -175,7 +175,7 @@ const result = score(evidence, {
   // not exist here. The repo actually in front of us wins when we harvested one.
   repoPath: args.evidenceFile ? (evidence?.repo?.path ?? repo) : repo,
   kitRoot: KIT_ROOT,
-  coachScorecard: readBundleFile(outDir, 'coach-scorecard.json'),
+  facilitatorScorecard: readBundleFile(outDir, 'facilitator-scorecard.json'),
   judgement: readBundleFile(outDir, 'judgement.json'),
   practice: true,
 });
@@ -217,7 +217,7 @@ if (!args.quiet) {
 
   // Notes, not deductions. Phrased so nobody reads a regex hit as an accusation: these
   // change no number, and a human decides whether they mean anything at all.
-  const notes = [...result.coachNotes.strong, ...result.coachNotes.weak];
+  const notes = [...result.facilitatorNotes.strong, ...result.facilitatorNotes.weak];
   if (notes.length) {
     console.log('\nWorth a second look (this changes nothing about your score):');
     for (const f of notes.slice(0, 5)) {
@@ -229,7 +229,7 @@ if (!args.quiet) {
   }
 
   if (args.explainIntegrity) {
-    const sc = result.coachNotes.scanned;
+    const sc = result.facilitatorNotes.scanned;
     console.log('\nInjection scan scope: ' + (sc?.scope ?? 'not run'));
     console.log('  files scanned: ' + (sc?.filesScanned ?? 0)
       + (sc?.kitFilesSkipped ? ', kit files skipped: ' + sc.kitFilesSkipped : ''));

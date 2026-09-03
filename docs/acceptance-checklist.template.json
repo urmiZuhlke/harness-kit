@@ -1,0 +1,17 @@
+{
+  "_readme": "An acceptance checklist turns 'does it actually work?' into the same question for every team. Write one before the event from the brief the teams were given, hand it to them on day one alongside the rubric, and have every facilitator score the demo against this list rather than against their own impression. Copy the `acceptance` array into each team's facilitator-scorecard.json and set `met` as you watch.",
+
+  "_how_to_write_one": "One entry per step of the core flow the brief asks teams to prove, in the order a demo would naturally run them. Six to twelve steps is the useful range: fewer and it does not discriminate, more and nobody can score it live. Each step must be something you can watch happen and be sure about — 'a second employee is prevented from booking the same desk' is observable, 'the architecture scales' is not. Steps are equally weighted, so do not include one that is trivially met alongside one that takes half the event.",
+
+  "_scoring": "Worth 5 points, awarded in proportion to steps met and rounded. All steps met scores 5; none met scores 0 and is reported as a failure rather than a fraction. An empty array leaves the criterion unscored, so an event that does not use a checklist loses no points.",
+
+  "event": "REPLACE — which event and brief this checklist belongs to",
+
+  "acceptance": [
+    {
+      "id": "REPLACE-short-kebab-case-id",
+      "label": "REPLACE — what a facilitator must watch happen, in one observable sentence",
+      "met": false
+    }
+  ]
+}

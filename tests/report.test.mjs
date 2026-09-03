@@ -30,16 +30,16 @@ function scoreFixture(overrides = {}) {
         points: 25, earned: 25, available: 25, status: 'assessed', errors: 0, criteria: [],
       },
       {
-        id: 'it-actually-works', label: 'It Actually Works', measuredBy: 'a coach, watching your demo',
+        id: 'it-actually-works', label: 'It Actually Works', measuredBy: 'a facilitator, watching your demo',
         points: 10, earned: 0, available: 0, status: 'not-harvested', errors: 0,
-        criteria: [{ id: 'demo', label: 'The use case runs', points: 10, earned: 0, status: 'not-harvested', evidence: null, lostBecause: 'awaiting a coach’s demo score' }],
+        criteria: [{ id: 'demo', label: 'The use case runs', points: 10, earned: 0, status: 'not-harvested', evidence: null, lostBecause: 'awaiting a facilitator’s demo score' }],
       },
     ],
     lostPoints: [{
       dimension: 'Working Method', criterion: 'Planned before building', lost: 5,
       reason: 'No planning step is visible.', evidence: 'plan-mode uses: 0',
     }],
-    coachNotes: { strong: [], weak: [], scanned: { filesScanned: 40, kitFilesSkipped: 0 } },
+    facilitatorNotes: { strong: [], weak: [], scanned: { filesScanned: 40, kitFilesSkipped: 0 } },
     badges: [], adjustment: null,
     ...overrides,
   };
@@ -47,10 +47,10 @@ function scoreFixture(overrides = {}) {
 
 /**
  * A team the injection scan produced a note about. Their score is untouched — that is the
- * whole point — so this fixture differs from a clean one only in `coachNotes`.
+ * whole point — so this fixture differs from a clean one only in `facilitatorNotes`.
  */
 const flaggedFixture = () => scoreFixture({
-  coachNotes: {
+  facilitatorNotes: {
     weak: [], scanned: { filesScanned: 12, kitFilesSkipped: 0 },
     strong: [{
       rule: 'evaluator-imperative', label: 'an instruction addressed at the reader',
@@ -125,12 +125,12 @@ test('a team that lost nothing is told so rather than shown an empty list', () =
 });
 
 test('a flagged team’s report is an ordinary report', () => {
-  // The participant report never accuses anyone. Notes go to a coach, through the CLI and
+  // The participant report never accuses anyone. Notes go to a facilitator, through the CLI and
   // score.json — never onto the page the team reads, and never onto the big screen.
   const score = flaggedFixture();
   const html = renderReport(score, null);
   assert.ok(!/Nice try/i.test(html));
-  assert.ok(!/AGENTS\.md:5/.test(html), 'a coach note leaked onto the participant report');
+  assert.ok(!/AGENTS\.md:5/.test(html), 'a facilitator note leaked onto the participant report');
   assert.ok(!/Ignore all previous instructions/.test(html));
   assert.match(html, new RegExp('data-count-to="' + score.total + '"'));
 });
@@ -168,14 +168,14 @@ test('every field of a criterion is escaped, including the one in a class attrib
   assert.ok(!html.includes('class="crit-"><'), 'the class attribute was broken out of');
 });
 
-test('a coach note cannot inject markup, because it is never rendered', () => {
+test('a facilitator note cannot inject markup, because it is never rendered', () => {
   const score = flaggedFixture();
-  score.coachNotes.strong[0].text = '</code><script>alert(1)</script>';
+  score.facilitatorNotes.strong[0].text = '</code><script>alert(1)</script>';
   const html = renderReport(score, null);
   assert.ok(!html.includes('<script>alert(1)</script>'));
 });
 
-test('badges are derived from evidence and merged with a coach’s', () => {
+test('badges are derived from evidence and merged with a facilitator’s', () => {
   const score = scoreFixture({ badges: ['caught-the-ai-being-wrong'] });
   score.dimensions.push({
     id: 'safety-and-boundaries', label: 'Safety & Boundaries', measuredBy: 'your repo',
@@ -190,7 +190,7 @@ test('badges are derived from evidence and merged with a coach’s', () => {
   assert.ok(ids.includes('kept-a-journal'));
   assert.ok(ids.includes('zero-secrets'));
   assert.ok(ids.includes('caught-the-ai-being-wrong'));
-  assert.equal(badges.find((b) => b.id === 'caught-the-ai-being-wrong').source, 'coach');
+  assert.equal(badges.find((b) => b.id === 'caught-the-ai-being-wrong').source, 'facilitator');
 });
 
 test('a flagged team keeps its badges', () => {
@@ -212,7 +212,7 @@ test('an unknown badge id still renders sensibly', () => {
 
 test('the leaderboard ranks every team in one table', () => {
   // There is no wall of shame any more. A flagged team is ranked on what it scored, like
-  // everyone else, and the note reaches a coach through the CLI instead.
+  // everyone else, and the note reaches a facilitator through the CLI instead.
   const rows = [
     { team: 'Team Alpha', score: scoreFixture(), evidence: null },
     { team: 'Team Beta', score: flaggedFixture(), evidence: null },
@@ -233,17 +233,17 @@ test('the leaderboard escapes team names', () => {
 
 // --- judged vs heuristic, and what is still pending ------------------------------------
 
-test('a dimension awaiting a coach’s judgement says so', () => {
-  const s = scoreFixture({ provisional: true, awaiting: [{ dimension: 'Working Method', criterion: 'Directed the agent repeatedly', needs: 'a coach’s judgement' }] });
+test('a dimension awaiting a facilitator’s judgement says so', () => {
+  const s = scoreFixture({ provisional: true, awaiting: [{ dimension: 'Working Method', criterion: 'Directed the agent repeatedly', needs: 'a facilitator’s judgement' }] });
   s.dimensions[0].criteria[0].judged = false;
   const row = dimensionRow(renderReport(s, null), 'Working Method');
-  assert.match(row, /awaiting a coach/);
-  assert.ok(!/coach-judged/.test(row), 'must not claim it was judged');
+  assert.match(row, /awaiting a facilitator/);
+  assert.ok(!/facilitator-judged/.test(row), 'must not claim it was judged');
 });
 
 /**
  * Isolate one dimension's row. The demo dimension legitimately carries the words
- * "awaiting a coach's demo score" in its own reason text, so a whole-page assertion would
+ * "awaiting a facilitator's demo score" in its own reason text, so a whole-page assertion would
  * match the wrong row.
  */
 function dimensionRow(html, label) {
@@ -253,12 +253,12 @@ function dimensionRow(html, label) {
   return row;
 }
 
-test('a dimension a coach has judged is labelled coach-judged', () => {
+test('a dimension a facilitator has judged is labelled facilitator-judged', () => {
   const s = scoreFixture();
   s.dimensions[0].criteria[0].judged = true;
   const row = dimensionRow(renderReport(s, null), 'Working Method');
-  assert.match(row, /coach-judged/);
-  assert.ok(!/awaiting a coach/.test(row), 'must not also claim it is pending');
+  assert.match(row, /facilitator-judged/);
+  assert.ok(!/awaiting a facilitator/.test(row), 'must not also claim it is pending');
 });
 
 test('an unjudgeable criterion is neither judged nor awaiting', () => {
@@ -267,17 +267,17 @@ test('an unjudgeable criterion is neither judged nor awaiting', () => {
   s.dimensions[0].criteria[0].judged = false;
   s.dimensions[0].criteria[0].status = 'not-harvested';
   const row = dimensionRow(renderReport(s, null), 'Working Method');
-  assert.ok(!/awaiting a coach/.test(row), 'unjudgeable is not the same as unattended');
-  assert.ok(!/coach-judged/.test(row));
+  assert.ok(!/awaiting a facilitator/.test(row), 'unjudgeable is not the same as unattended');
+  assert.ok(!/facilitator-judged/.test(row));
 });
 
-test('the header states how many coach actions are outstanding', () => {
+test('the header states how many facilitator actions are outstanding', () => {
   const s = scoreFixture({
     provisional: true,
     awaiting: [
-      { dimension: 'Working Method', criterion: 'x', needs: 'a coach’s judgement' },
-      { dimension: 'It Actually Works', needs: 'a coach’s score' },
+      { dimension: 'Working Method', criterion: 'x', needs: 'a facilitator’s judgement' },
+      { dimension: 'It Actually Works', needs: 'a facilitator’s score' },
     ],
   });
-  assert.match(renderReport(s, null), /awaiting 2 coach action\(s\)/);
+  assert.match(renderReport(s, null), /awaiting 2 facilitator action\(s\)/);
 });

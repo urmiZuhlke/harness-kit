@@ -5,7 +5,7 @@ Reference for anyone changing the kit. To just use it, read the
 
 ```
 harness-kit/
-├── README.md                          ← what this is, for teams and for coaches
+├── README.md                          ← what this is, for teams and for facilitators
 ├── docs/
 │   ├── rubric.md                      ← THE scoring standard: 6 dimensions, 100 points
 │   ├── repo-structure.md              ← you are here
@@ -33,7 +33,7 @@ harness-kit/
 ## Arriving with later stories
 
 `bin/vibecheck.mjs` (harvest + score), `lib/harvest/` (repo, git, Claude Code and Copilot
-adapters), `lib/score/`, `lib/integrity/`, `bin/leaderboard.mjs` and the coach/participant
+adapters), `lib/score/`, `lib/integrity/`, `bin/leaderboard.mjs` and the facilitator/participant
 material. See [`stories/`](stories/) for the sequence.
 
 ## The two sections, one line each

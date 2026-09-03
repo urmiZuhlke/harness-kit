@@ -377,7 +377,7 @@ test('a credential in a tracked file is still a leak', async () => {
 test('a foreign git index cannot vouch that a secret is untracked', async () => {
   // `git ls-files` succeeding is not evidence that it answered about the repo we asked
   // about. Run inside a directory that merely sits within someone else's repository — a
-  // coach keeping `bundles/` under version control, a git-managed home directory — it
+  // facilitator keeping `bundles/` under version control, a git-managed home directory — it
   // exits 0 and prints nothing, and that empty answer read as "nothing is tracked". Every
   // committed credential was then reclassified as untracked, and a repo with a live AWS
   // key scored 5/5 on "No secrets in tracked files" and earned a Clean Hands badge.

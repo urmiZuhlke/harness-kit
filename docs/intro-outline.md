@@ -10,8 +10,8 @@ budget, not a script.
 | 3 | The rubric | 8 | Walk the six dimensions and their weights from [`docs/rubric.md`](rubric.md). Say plainly: this is the whole rubric, nothing is added later, optimise for it freely. |
 | 4 | How scoring works | 5 | Live-demo `node bin/vibecheck.mjs` against a throwaway repo. Show the `report.html` output. Explain practice mode and the mid-point checkpoint. |
 | 5 | Privacy | 3 | What's read, what's extracted, what's never copied — from the one-pager. Say it out loud, don't just point at the doc. |
-| 6 | The injection dare | 3 | Announce the scorer is adversarially tested. Show what a caught attempt looks like on the live demo repo — a note for a coach, with the score unchanged. Say plainly that nothing here deducts points automatically, and why. Frame it as a dare, not a trap — and mention the reporting badge. |
-| 7 | Logistics & starting tips | 3 | Coach assignments, checkpoint times, where to find help, the five starting tips from the one-pager. |
+| 6 | The injection dare | 3 | Announce the scorer is adversarially tested. Show what a caught attempt looks like on the live demo repo — a note for a facilitator, with the score unchanged. Say plainly that nothing here deducts points automatically, and why. Frame it as a dare, not a trap — and mention the reporting badge. |
+| 7 | Logistics & starting tips | 3 | Facilitator assignments, checkpoint times, where to find help, the five starting tips from the one-pager. |
 | | **Total** | **30** | |
 
 ## Delivery notes

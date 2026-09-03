@@ -1,0 +1,60 @@
+{
+  "_readme": "A worked example, not part of the kit's rubric. This is what an acceptance checklist looks like when it is written from a real brief — here a desk-and-parking booking prototype whose spec named a ten-step demo scenario. Copy the shape, not the content: your event's checklist comes from your event's brief. See docs/acceptance-checklist.template.json for how to write one.",
+
+  "event": "Example — a two-day prototype event, desk and parking booking brief",
+
+  "_note_on_the_last_two": "Every step below is something a facilitator can watch happen and be sure about. The brief also asked for multi-office support and a scalable architecture; neither is on this list, because neither can be observed in a demo. Those belong in the proposal a jury reads, not in a checklist someone scores live.",
+
+  "acceptance": [
+    {
+      "id": "admin-creates-resources",
+      "label": "An administrator creates or enables one desk and one parking space",
+      "met": false
+    },
+    {
+      "id": "employee-books-both",
+      "label": "An employee books both resources for the same working day",
+      "met": false
+    },
+    {
+      "id": "conflict-prevented",
+      "label": "A second employee is prevented from booking the same desk for that day",
+      "met": false
+    },
+    {
+      "id": "check-in-accepted",
+      "label": "The first employee checks in for the desk before the release deadline, by any method the team implemented",
+      "met": false
+    },
+    {
+      "id": "deadline-simulated",
+      "label": "The team can move time past the release deadline on demand, rather than waiting for it",
+      "met": false
+    },
+    {
+      "id": "unclaimed-released",
+      "label": "The checked-in desk booking survives, and the un-checked-in parking booking is released",
+      "met": false
+    },
+    {
+      "id": "released-rebookable",
+      "label": "The second employee can then book the released parking space",
+      "met": false
+    },
+    {
+      "id": "history-visible",
+      "label": "An administrator can see the booking, check-in and release history for that day",
+      "met": false
+    },
+    {
+      "id": "policy-change-takes-effect",
+      "label": "An administrator changes a rule or a resource status and the change is immediately in effect",
+      "met": false
+    },
+    {
+      "id": "runs-from-clean-clone",
+      "label": "The setup and run instructions get the prototype running on a machine that has never seen it",
+      "met": false
+    }
+  ]
+}

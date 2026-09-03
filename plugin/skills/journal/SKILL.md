@@ -15,7 +15,7 @@ Three reasons, in order of value:
 
 1. **It is the reflection step.** Writing down what went wrong and how you knew it worked
    is where most of the learning in a session actually happens.
-2. **It lets a coach catch up without interrupting you.** They read the journal instead of
+2. **It lets a facilitator catch up without interrupting you.** They read the journal instead of
    asking "where are you at?"
 3. **It is the fallback evidence source.** If your AI tool's transcripts cannot be read by
    the scorer, this is what represents your process. Its credit is capped deliberately —

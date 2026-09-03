@@ -1,5 +1,5 @@
 {
-  "_readme": "This is what the coach-judge skill writes automatically to <bundle>/judgement.json. You don't hand-write this — it's here so the format is inspectable without running the skill. Delete this key if you ever hand-edit a real one, which you shouldn't need to.",
+  "_readme": "This is what the facilitator-judge skill writes automatically to <bundle>/judgement.json. You don't hand-write this — it's here so the format is inspectable without running the skill. Delete this key if you ever hand-edit a real one, which you shouldn't need to.",
 
   "schemaVersion": 1,
   "model": "claude-opus-5",
