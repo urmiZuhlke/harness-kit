@@ -290,3 +290,71 @@ test('a team that does everything, checked by a facilitator, scores 100', () => 
   assert.equal(r.provisional, false);
   assert.equal(r.complete, true);
 });
+
+// --- regressions from the review pass ---------------------------------------------------
+//
+// Every test below is a bug that shipped in the same change that added these criteria.
+// They are grouped here rather than scattered because they share one cause: a criterion's
+// maximum moved and something that referenced the old maximum did not.
+
+test('a partial outcome can never equal the criterion maximum', () => {
+  // The bug this catches: `deliberate-boundaries` fell from 3 points to 2 while its
+  // no-transcript branch still returned partial(2) — full marks for a team with no
+  // permission policy and no evidence either way. The scorer now reports such a criterion
+  // as its own fault rather than paying out.
+  const ev = evidenceFixture({ noChatEvidence: true });
+  for (const d of score(ev).dimensions) {
+    for (const c of d.criteria) {
+      if (c.status !== 'partial') continue;
+      assert.ok(c.earned > 0 && c.earned < c.points,
+        d.id + '/' + c.id + ' awarded ' + c.earned + ' of ' + c.points + ' as a partial');
+    }
+  }
+});
+
+test('the same holds for a team with full transcripts', () => {
+  const r = score(evidenceFixture(), {
+    facilitatorScorecard: { demo: { points: 4 }, acceptance: [{ id: 'a', met: true }, { id: 'b', met: false }], privacy: { met: true } },
+  });
+  for (const d of r.dimensions) {
+    for (const c of d.criteria) {
+      if (c.status !== 'partial') continue;
+      assert.ok(c.earned > 0 && c.earned < c.points,
+        d.id + '/' + c.id + ' awarded ' + c.earned + ' of ' + c.points + ' as a partial');
+    }
+  }
+});
+
+test('no readable transcripts does not earn full marks for boundaries', () => {
+  const ev = evidenceFixture({ noChatEvidence: true });
+  const c = criterion(score(ev), 'safety-and-boundaries', 'deliberate-boundaries');
+  // The fixture commits permission settings, so remove them to reach the branch.
+  ev.repoEvidence.safety = { ...ev.repoEvidence.safety, claudeSettingsPresent: false };
+  const without = criterion(score(ev), 'safety-and-boundaries', 'deliberate-boundaries');
+  assert.equal(c.status, 'pass', 'committed settings still earn the criterion outright');
+  assert.equal(without.status, 'partial');
+  assert.ok(without.earned < without.points,
+    'no policy and no evidence must not score the same as a proven-clean team');
+});
+
+test('an all-met acceptance checklist reads as a sentence, not a dangling colon', () => {
+  const r = score(evidenceFixture(), {
+    facilitatorScorecard: { acceptance: [{ id: 'a', met: true }, { id: 'b', met: true }] },
+  });
+  const c = criterion(r, 'it-actually-works', 'acceptance-checklist');
+  assert.match(c.evidence, /all of them$/);
+  assert.doesNotMatch(c.evidence, /: $/, 'the unmet list must not be printed when empty');
+});
+
+test('the dimension facilitatorScored flag follows its criteria', () => {
+  // Declared in two places, the flag drifted: a dimension claimed the scorer computed all
+  // of it while one criterion waited on a person, and the leaderboard reported that
+  // pending check as permanently unassessable.
+  const r = score(evidenceFixture());
+  const safety = r.dimensions.find((d) => d.id === 'safety-and-boundaries');
+  const works = r.dimensions.find((d) => d.id === 'it-actually-works');
+  const repro = r.dimensions.find((d) => d.id === 'reproducibility');
+  assert.equal(safety.facilitatorScored, true, 'it holds the sample-data check');
+  assert.equal(works.facilitatorScored, true);
+  assert.equal(repro.facilitatorScored, false, 'nothing here waits on a person');
+});

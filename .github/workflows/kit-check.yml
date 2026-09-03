@@ -14,6 +14,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # Must resolve to 22.5 or newer: the Cursor adapter reads its history through
+          # node:sqlite, and tests/adapters.test.mjs *skips* its Cursor cases when that
+          # module is absent rather than failing. On an older runtime this job would go
+          # green with a whole adapter untested.
           node-version: "22"
 
       - name: Unit tests (harvester, scorer, injection detection)

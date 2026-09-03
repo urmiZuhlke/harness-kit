@@ -281,3 +281,43 @@ test('the header states how many facilitator actions are outstanding', () => {
   });
   assert.match(renderReport(s, null), /awaiting 2 facilitator action\(s\)/);
 });
+
+test('Clean Hands survives a criterion that is only waiting on a person', () => {
+  // The badge used to require the whole dimension to be 'assessed'. The moment a
+  // facilitator-scored sample-data check joined Safety, that became unreachable in
+  // practice mode: a team with no secrets, a proper .gitignore and a committed permission
+  // policy earned every point a script can award and was shown nothing.
+  const score = scoreFixture();
+  score.dimensions.push({
+    id: 'safety-and-boundaries', label: 'Safety, Privacy & Boundaries',
+    measuredBy: 'your repo', points: 10, earned: 8, available: 8, status: 'partial',
+    facilitatorScored: true, errors: 0,
+    criteria: [
+      { id: 'no-secrets', points: 4, earned: 4, status: 'pass' },
+      { id: 'env-handling', points: 2, earned: 2, status: 'pass' },
+      { id: 'deliberate-boundaries', points: 2, earned: 2, status: 'pass' },
+      { id: 'privacy-of-sample-data', points: 2, earned: 0, status: 'not-harvested', facilitatorScored: true },
+    ],
+  });
+  const ids = deriveBadges(score, null).map((b) => b.id);
+  assert.ok(ids.includes('zero-secrets'));
+});
+
+test('Clean Hands is not awarded when a machine-checked criterion is unread', () => {
+  // The counterpart: a scan that hit its file limit means "we do not know", and a badge
+  // saying the repo is clean would be an assertion nobody made.
+  const score = scoreFixture();
+  score.dimensions.push({
+    id: 'safety-and-boundaries', label: 'Safety, Privacy & Boundaries',
+    measuredBy: 'your repo', points: 10, earned: 4, available: 4, status: 'partial',
+    facilitatorScored: true, errors: 0,
+    criteria: [
+      { id: 'no-secrets', points: 4, earned: 0, status: 'not-harvested' },
+      { id: 'env-handling', points: 2, earned: 2, status: 'pass' },
+      { id: 'deliberate-boundaries', points: 2, earned: 2, status: 'pass' },
+      { id: 'privacy-of-sample-data', points: 2, earned: 0, status: 'not-harvested', facilitatorScored: true },
+    ],
+  });
+  const ids = deriveBadges(score, null).map((b) => b.id);
+  assert.ok(!ids.includes('zero-secrets'), 'an unfinished secrets scan is not a clean bill');
+});

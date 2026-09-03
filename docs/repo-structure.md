@@ -30,6 +30,7 @@ harness-kit/
 │   ├── cross-tool-setup.md
 │   ├── templates/
 │   │   ├── AGENTS.md · CLAUDE.md · copilot-instructions.md
+│   │   ├── project-context.md         ← the problem, not the repo (scored separately)
 │   │   ├── story-template.md · ai-infrastructure.md
 │   │   └── instructions/              ← 8 generic path-scoped rule files
 │   └── skills/systematic-debugging/

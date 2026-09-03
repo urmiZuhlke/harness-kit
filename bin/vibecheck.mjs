@@ -30,10 +30,11 @@ function parseArgs(argv) {
   const args = {
     repo: process.cwd(), runTestSuite: true, testTimeoutMs: 120000,
     quiet: false, harvestOnly: false, explainIntegrity: false, evidenceFile: null,
+    repoGiven: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--repo') args.repo = argv[++i];
+    if (arg === '--repo') { args.repo = argv[++i]; args.repoGiven = true; }
     else if (arg === '--evidence') args.evidenceFile = argv[++i];
     else if (arg === '--no-run-tests') args.runTestSuite = false;
     else if (arg === '--test-timeout') args.testTimeoutMs = Number(argv[++i]) * 1000;
@@ -61,7 +62,9 @@ provisional until a facilitator scores your demo, and nothing else changes betwe
 Options:
   --repo <path>          Repository to check (default: current directory)
   --evidence <file>      Score an existing evidence file instead of harvesting. Use this
-                         on a team bundle from bin/merge-evidence.mjs.
+                         on a team bundle from bin/merge-evidence.mjs. Combine it with
+                         --repo to scan the repo you have in front of you rather than the
+                         path recorded on whichever machine produced the bundle.
   --no-run-tests         Do not execute the detected test command
   --test-timeout <secs>  Timeout for the test run (default: 120)
   --harvest-only         Collect evidence without scoring it
@@ -100,6 +103,15 @@ function statusLine(name, src) {
 const args = parseArgs(process.argv.slice(2));
 if (args.help) { help(); process.exit(0); }
 
+// --harvest-only collects evidence; --evidence scores evidence already collected. Asked
+// for together they would read a file back and print its own path, which is nobody's
+// intention and easy to reach out of habit.
+if (args.evidenceFile && args.harvestOnly) {
+  console.error('--harvest-only and --evidence do opposite things: one collects evidence, '
+    + 'the other scores evidence already collected. Pick one.');
+  process.exit(1);
+}
+
 const repo = resolve(args.repo);
 if (!args.quiet) {
   if (args.evidenceFile) {
@@ -110,10 +122,26 @@ if (!args.quiet) {
   }
 }
 
+/** Read a bundle handed to us, failing the way the rest of this toolchain fails. */
+function readEvidenceFile(path) {
+  const full = resolve(path);
+  if (!existsSync(full)) {
+    console.error('No evidence file at ' + full
+      + '\nIf you meant to build one, run: node bin/merge-evidence.mjs --dir <collected> --out <file>');
+    process.exit(1);
+  }
+  try {
+    return JSON.parse(readFileSync(full, 'utf8'));
+  } catch (err) {
+    console.error('Could not read ' + full + ': ' + err.message);
+    process.exit(1);
+  }
+}
+
 // Scoring an existing file is the merged-team path: the harvest already happened, once
 // per machine, and re-running it here would throw away every other member's evidence.
 const evidence = args.evidenceFile
-  ? JSON.parse(readFileSync(resolve(args.evidenceFile), 'utf8'))
+  ? readEvidenceFile(args.evidenceFile)
   : await harvest(repo, {
     kitRoot: KIT_ROOT,
     runTestSuite: args.runTestSuite,
@@ -170,10 +198,20 @@ if (args.harvestOnly) {
   process.exit(0);
 }
 
+// Which repo the injection scan should read. A merged bundle records the path it had on
+// whichever machine produced it, which usually does not exist here — but a --repo the
+// operator actually typed beats it, because that is the checkout in front of them. Without
+// this, `--evidence bundle.json --repo .` scanned a teammate's laptop path and silently
+// reported nothing scanned.
+const scanPath = !args.evidenceFile || args.repoGiven ? repo : (evidence?.repo?.path ?? repo);
+if (!args.quiet && args.evidenceFile && !args.repoGiven && !existsSync(scanPath)) {
+  console.log('  note: the repo this bundle came from (' + scanPath + ') is not on this');
+  console.log('        machine, so only the evidence excerpts are scanned. Pass --repo');
+  console.log('        <path> to scan your own checkout.');
+}
+
 const result = score(evidence, {
-  // A merged bundle carries the repo path from the member machine it came from, which may
-  // not exist here. The repo actually in front of us wins when we harvested one.
-  repoPath: args.evidenceFile ? (evidence?.repo?.path ?? repo) : repo,
+  repoPath: scanPath,
   kitRoot: KIT_ROOT,
   facilitatorScorecard: readBundleFile(outDir, 'facilitator-scorecard.json'),
   judgement: readBundleFile(outDir, 'judgement.json'),

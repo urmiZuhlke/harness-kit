@@ -16,7 +16,11 @@ published up front. Nothing is hidden.
 **2. Build your harness.** Templates to start from live in
 [`02-agentic-preparation/templates/`](02-agentic-preparation/templates/):
 
-- `AGENTS.md` / `CLAUDE.md` / `copilot-instructions.md` — the instruction layer
+- `AGENTS.md` / `CLAUDE.md` / `copilot-instructions.md` — the instruction layer: how to
+  work in this repo
+- `project-context.md` — the problem itself: the domain, its rules, your decisions. Save
+  it as `docs/project-context.md`; it is scored separately from the instruction layer,
+  because an agent cannot infer any of it from your source
 - `instructions/` — path-scoped rules, for where they earn their place
 - `story-template.md` — a structure for the work you hand an agent
 

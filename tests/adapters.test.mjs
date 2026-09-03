@@ -16,8 +16,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { harvestCodex } from '../lib/harvest/adapters/codex.mjs';
-import { harvestCursor } from '../lib/harvest/adapters/cursor.mjs';
-import { makeIsInRepo } from '../lib/harvest/shared.mjs';
+import { commandFrom, harvestCursor } from '../lib/harvest/adapters/cursor.mjs';
+import { editorStorageRoots, makeIsInRepo, workspaceFolderOf } from '../lib/harvest/shared.mjs';
 
 // --- Codex ----------------------------------------------------------------------------
 //
@@ -280,4 +280,80 @@ test('Cursor installed but never used on this repo is empty, not not-harvested',
     const r = await harvestCursor({ isInRepo: makeIsInRepo(REPO) });
     assert.equal(r.source.status, 'empty');
   });
+});
+
+// --- regressions from the review pass ---------------------------------------------------
+
+test('a Cursor command survives an argument blob truncated mid-JSON', needsSqlite, async () => {
+  // SQLite cuts the argument blob at a fixed length, so the *longest* commands arrive as
+  // invalid JSON. Returning null there removed the run from every counter — not counted as
+  // `other`, and never recorded as a test run — so a team's longest test invocation was
+  // the one most likely to vanish.
+  const long = 'npm test -- ' + '--reporter=verbose '.repeat(200);
+  const truncated = JSON.stringify({ command: long, explanation: 'x' }).slice(0, 2000);
+  const home = cursorHome({
+    folder: REPO,
+    bubbles: [
+      userBubble('Run the suite.'),
+      {
+        type: 2,
+        toolFormerData: {
+          name: 'run_terminal_cmd',
+          rawArgs: truncated,
+          result: JSON.stringify({ output: '12 passed' }),
+        },
+      },
+    ],
+  });
+  await withHome(home, async () => {
+    const [s] = (await harvestCursor({ isInRepo: makeIsInRepo(REPO) })).sessions;
+    assert.equal(s.commands.test, 1, 'the command must still be classified');
+    assert.deepEqual(s.testRuns.map((t) => t.outcome), ['pass']);
+  });
+});
+
+test('commandFrom reads well-formed, truncated and unusable arguments alike', () => {
+  assert.equal(commandFrom(JSON.stringify({ command: 'pytest -q' })), 'pytest -q');
+  // Truncated after the command value, with no closing quote or brace.
+  assert.equal(commandFrom('{"explanation":"x","command":"pytest -q --cov'), 'pytest -q --cov');
+  assert.equal(commandFrom('{"command":"echo \\"hi\\" && npm test'), 'echo "hi" && npm test');
+  for (const unusable of [null, undefined, '', '{}', '{"explanation":"no command here"}']) {
+    assert.equal(commandFrom(unusable), null, JSON.stringify(unusable));
+  }
+});
+
+test('a workspace URI that is not a file: URI is not parsed as one', () => {
+  // fileURLToPath throws on vscode-remote:// and friends. One adapter guarded for this and
+  // the other did not, so the same remote workspace crashed one harvest and not the other.
+  const dir = mkdtempSync(join(tmpdir(), 'hk-ws-'));
+  try {
+    writeFileSync(join(dir, 'workspace.json'),
+      JSON.stringify({ folder: 'vscode-remote://ssh-remote%2Bbox/home/ana/app' }), 'utf8');
+    assert.equal(workspaceFolderOf(dir), 'vscode-remote://ssh-remote%2Bbox/home/ana/app');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a missing or malformed workspace.json resolves to null, not a throw', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hk-ws-'));
+  try {
+    assert.equal(workspaceFolderOf(dir), null, 'no workspace.json at all');
+    writeFileSync(join(dir, 'workspace.json'), '{ not json', 'utf8');
+    assert.equal(workspaceFolderOf(dir), null, 'unparseable');
+    writeFileSync(join(dir, 'workspace.json'), JSON.stringify({ folder: 42 }), 'utf8');
+    assert.equal(workspaceFolderOf(dir), null, 'not a string');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('editor storage roots are found per platform, and only when they exist', () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-roots-'));
+  try {
+    const env = { APPDATA: join(home, 'AppData', 'Roaming'), XDG_CONFIG_HOME: join(home, '.config') };
+    // Nothing on disk yet: an app that was never installed contributes no root.
+    assert.deepEqual(editorStorageRoots(['Cursor'], { platform: 'win32', env, home }), []);
+    const user = join(env.APPDATA, 'Cursor', 'User');
+    mkdirSync(user, { recursive: true });
+    assert.deepEqual(editorStorageRoots(['Cursor'], { platform: 'win32', env, home }), [user]);
+    // The same call on another platform looks somewhere else and finds nothing.
+    assert.deepEqual(editorStorageRoots(['Cursor'], { platform: 'linux', env, home }), []);
+  } finally { rmSync(home, { recursive: true, force: true }); }
 });
