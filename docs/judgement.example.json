@@ -3,17 +3,21 @@
 
   "schemaVersion": 1,
   "model": "claude-opus-5",
-  "promptVersion": "1.1.0",
-  "judgedAt": "2026-08-22T09:15:00.000Z",
+  "promptVersion": "2.0.0",
+  "judgedAt": "2026-09-03T09:15:00.000Z",
 
   "criteria": {
     "harness-is-substantive": {
-      "points": 5,
+      "points": 4,
       "justification": "AGENTS.md names the actual stack (FastAPI + SQLModel) and two real rules — 'every mutating endpoint requires an idempotency key' and 'never write to the ledger table outside services/ledger.py' — that couldn't have come from a template. Loses a point because the testing section is still generic advice ('write tests for new behaviour') rather than this project's own conventions."
     },
     "iterative-direction": {
-      "points": 7,
-      "justification": "The team's second prompt narrowed 'build the booking flow' from the first prompt down to 'just the availability check, we'll wire payment after' — a real decision, not a restatement. Prompts throughout the session read as a sequence of scoped asks rather than one large spec."
+      "points": 6,
+      "justification": "The team's second prompt narrowed 'build the booking flow' from the first prompt down to 'just the availability check, we'll wire payment after' — a real decision, not a restatement. Prompts throughout read as a sequence of scoped asks rather than one large spec. Not full marks: the last third of the session is three near-identical 'continue' turns with no visible decision in them."
+    },
+    "domain-context-captured": {
+      "points": 6,
+      "justification": "docs/project-context.md records the domain in its own terms — a booking is one working day, a released resource never auto-restores, and a late check-in event is an administrator's problem rather than the system's. The decision log gives the reason for the 10:00 release deadline and names the alternative that was rejected, which is the part a stranger could not have reconstructed from the code."
     }
   }
 }
