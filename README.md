@@ -29,20 +29,54 @@ the rubric rewards *your* project's real rules, commands and constraints.
 node bin/vibecheck.mjs
 ```
 
-> Not built yet — arrives with story 3. Until then, read the rubric and self-assess.
+It reads your repo, your git history and your AI chat transcripts — locally — and writes
+`.vibecheck/report.html` with your score and what to do next, ranked by what it is worth.
 
-## For coaches
+**4. If you are more than one person, merge your evidence.** Transcripts live in each
+person's home directory, so a check on one laptop scores one person and calls it the team:
 
-- [`docs/rubric.md`](docs/rubric.md) — the shared standard every coach scores against
-- Field guide and intro material — arriving with story 6
-- Leaderboard across all teams — arriving with story 5
+```bash
+node bin/vibecheck.mjs --harvest-only              # each member, in the team's repo
+node bin/merge-evidence.mjs --dir collected --out team/evidence.json
+node bin/vibecheck.mjs --evidence team/evidence.json
+```
+
+Transcripts can be read from **Claude Code, GitHub Copilot in VS Code, Codex CLI and
+Cursor**. Anything else is reported as unassessed rather than failed — run `/journal` at
+milestones as your fallback.
+
+## For facilitators
+
+- [`docs/rubric.md`](docs/rubric.md) — the shared standard every team is scored against
+- [`docs/facilitator-field-guide.md`](docs/facilitator-field-guide.md) — one page: the
+  intervention ladder, the cadence, and the three things to do before the event starts
+- [`docs/participant-one-pager.md`](docs/participant-one-pager.md) — what teams are told,
+  including the privacy notice they consent to
+- [`docs/acceptance-checklist.template.json`](docs/acceptance-checklist.template.json) —
+  write this from your event's brief; it is 5 of the 100 points
+- [`docs/intro-outline.md`](docs/intro-outline.md) — a 30-minute kickoff outline
+- Leaderboard across every team:
+
+```bash
+node bin/leaderboard.mjs --dir bundles --html leaderboard.html
+```
+
+It recomputes each score from the team's `evidence.json` and ignores whatever
+`score.json` a bundle contains, so a team editing their own score changes nothing.
 
 ## What this measures
 
-Engineering leverage, not consumption. Token counts, lines of code and commit numbers are
-not inputs to the score. What carries weight is evidence that is expensive to fake: a real
-plan-implement-test-fix loop in your transcripts, a harness that existed before the code,
-and tests that actually run.
+Engineering leverage, not consumption. Token counts, lines of code, commit numbers and
+team size are not inputs to the score. What carries weight is evidence that is expensive
+to fake: a real plan-implement-test-fix loop in your transcripts, a harness that existed
+before the code, a written account of the problem being solved, and tests that actually
+run.
+
+## Requirements
+
+Node 20 or newer, and nothing to install — the tests use Node's built-in runner. Reading
+Cursor's history needs Node 22.5 or newer, because it uses `node:sqlite`; on an older
+runtime that one source reports as unreadable and nothing else changes.
 
 ## Optional: install the agent roster globally
 

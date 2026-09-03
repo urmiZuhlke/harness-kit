@@ -6,8 +6,24 @@ Reference for anyone changing the kit. To just use it, read the
 ```
 harness-kit/
 ├── README.md                          ← what this is, for teams and for facilitators
+├── bin/
+│   ├── vibecheck.mjs                  ← harvest a repo and score it (also --evidence)
+│   ├── merge-evidence.mjs             ← combine several members' harvests into a team bundle
+│   └── leaderboard.mjs                ← rank every team, recomputed from their evidence
+├── lib/
+│   ├── harvest/                       ← repo, git, journal + one adapter per AI tool
+│   │   ├── adapters/                  ← claude-code · copilot · codex · cursor
+│   │   └── merge.mjs                  ← union sessions, re-derive every total
+│   ├── score/                         ← dimensions.mjs is the rubric as code
+│   ├── integrity/injection.mjs        ← notes for a facilitator; moves no number
+│   └── report/                        ← report.html and the leaderboard page
 ├── docs/
 │   ├── rubric.md                      ← THE scoring standard: 6 dimensions, 100 points
+│   ├── participant-one-pager.md       ← what teams get, incl. the privacy notice
+│   ├── facilitator-field-guide.md     ← one page for whoever runs the event
+│   ├── facilitator-scorecard.template.json
+│   ├── acceptance-checklist.template.json  ← write one per event from its own brief
+│   ├── examples/                      ← worked instances; never part of the rubric
 │   ├── repo-structure.md              ← you are here
 │   └── stories/                       ← the build plan, one file per story
 ├── 02-agentic-preparation/            ← what teams start from
@@ -30,11 +46,14 @@ harness-kit/
     └── skills/harness-kit/            ← /harness-kit new · /harness-kit init
 ```
 
-## Arriving with later stories
+## Where the rules live
 
-`bin/vibecheck.mjs` (harvest + score), `lib/harvest/` (repo, git, Claude Code and Copilot
-adapters), `lib/score/`, `lib/integrity/`, `bin/leaderboard.mjs` and the facilitator/participant
-material. See [`stories/`](stories/) for the sequence.
+- **The rubric is `lib/score/dimensions.mjs`.** [`rubric.md`](rubric.md) is the published
+  summary of the same weights, and `kit-check` fails the build if the two disagree.
+- **What "it works" means is not in the rubric.** It comes from each event's acceptance
+  checklist, so the kit survives the next event without a fork.
+- **Every adapter produces the same session shape**, which is what lets `merge.mjs` union
+  them and `summariseSessions` re-derive one set of totals for a whole team.
 
 ## The two sections, one line each
 

@@ -7,11 +7,11 @@ budget, not a script.
 | - | ------- | ------: | ------ |
 | 1 | The use case | 4 | What they're building today, and why it exists. |
 | 2 | Not just "does it work" | 4 | Finishing the use case is necessary, not sufficient. Today also scores *how* it was built — hand out / display [`docs/participant-one-pager.md`](participant-one-pager.md). |
-| 3 | The rubric | 8 | Walk the six dimensions and their weights from [`docs/rubric.md`](rubric.md). Say plainly: this is the whole rubric, nothing is added later, optimise for it freely. |
-| 4 | How scoring works | 5 | Live-demo `node bin/vibecheck.mjs` against a throwaway repo. Show the `report.html` output. Explain practice mode and the mid-point checkpoint. |
+| 3 | The rubric | 8 | Walk the six dimensions and their weights from [`docs/rubric.md`](rubric.md). Say plainly: this is the whole rubric, nothing is added later, optimise for it freely. Hand out this event's acceptance checklist here — it is 5 of the 100 points and must not be a surprise. |
+| 4 | How scoring works | 5 | Live-demo `node bin/vibecheck.mjs` against a throwaway repo. Show the `report.html` output. Explain practice mode. **Then say the thing teams most often miss: transcripts live on each person's laptop, so every member harvests and one person merges** — show the two commands, and say they should do it once mid-way rather than first at hand-in. |
 | 5 | Privacy | 3 | What's read, what's extracted, what's never copied — from the one-pager. Say it out loud, don't just point at the doc. |
 | 6 | The injection dare | 3 | Announce the scorer is adversarially tested. Show what a caught attempt looks like on the live demo repo — a note for a facilitator, with the score unchanged. Say plainly that nothing here deducts points automatically, and why. Frame it as a dare, not a trap — and mention the reporting badge. |
-| 7 | Logistics & starting tips | 3 | Facilitator assignments, checkpoint times, where to find help, the five starting tips from the one-pager. |
+| 7 | Logistics & starting tips | 3 | Facilitator assignments, when the authoritative snapshot is taken, where to find help, the six starting tips from the one-pager. |
 | | **Total** | **30** | |
 
 ## Delivery notes
@@ -25,5 +25,9 @@ budget, not a script.
   rather than cutting it.
 - **Section 6 should get a genuine laugh, not a lecture tone.** The reaction you want is
   "wait, we could actually try that" — that's the workshop working.
-- End by pointing at the mid-point checkpoint time on a clock or agenda, so it's a fact
-  people note down, not a vague promise.
+- **Section 4's merge instruction is the one to repeat.** A team that never merges is
+  scored on one member's day, and nothing in the output looks wrong — they just come out
+  lower than they earned. Say it in section 4, put it in writing, and have facilitators ask
+  about it on their first lap.
+- End by pointing at the hand-in deadline on a clock or agenda, and say which snapshot
+  ranks them, so both are facts people note down rather than vague promises.

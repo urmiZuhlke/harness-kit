@@ -134,10 +134,21 @@ const clean = [...rows]
  * the time.
  */
 const unassessable = (r) => r.dimensions
-  .filter((d) => d.status !== 'assessed' && !d.facilitatorScored)
-  .map((d) => {
-    const why = d.criteria.find((c) => c.status === 'not-harvested' && c.lostBecause)?.lostBecause;
-    return d.label + (why ? ' — ' + why : '');
+  .filter((d) => !d.facilitatorScored)
+  .map((d) => ({
+    label: d.label,
+    // Only criteria nobody *can* assess. A criterion waiting on a facilitator is pending,
+    // not unassessable, and the block above already reports it — listing it here tells a
+    // facilitator "no action will change this" about work they are about to do. Filtering
+    // at dimension level stopped being enough once a facilitator-settled criterion (the
+    // sample-data check) came to live inside a dimension the scorer otherwise computes on
+    // its own.
+    unreadable: d.criteria.filter((c) => c.status === 'not-harvested' && !c.facilitatorScored),
+  }))
+  .filter((entry) => entry.unreadable.length > 0)
+  .map((entry) => {
+    const why = entry.unreadable.find((c) => c.lostBecause)?.lostBecause;
+    return entry.label + (why ? ' — ' + why : '');
   });
 
 // A team is only listed as `incomplete` when something was genuinely unreadable. A score

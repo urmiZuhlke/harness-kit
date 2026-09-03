@@ -7,10 +7,14 @@ the template teams copy — that lives at
 ## What this repo is
 
 harness-kit is a workshop kit: harness templates teams fill in, a published scoring rubric,
-and (arriving with stories 2–5) a scorer that turns a team's repo, git history and AI chat
-transcripts into a score out of 100. Markdown and plain Node scripts — no build, no
-runtime. See [`docs/repo-structure.md`](docs/repo-structure.md) for the map and
-[`docs/stories/`](docs/stories/) for what is planned and why.
+and a scorer that turns a team's repo, git history and AI chat transcripts into a score out
+of 100. Markdown and plain Node scripts — no build, no runtime. See
+[`docs/repo-structure.md`](docs/repo-structure.md) for the map and
+[`docs/stories/`](docs/stories/) for what was built and why.
+
+It is used at more than one event, by teams of one to five, over anything from half a day
+to two days. Every rule below that looks pedantic about genericity or about scale is there
+because a previous version of the kit assumed one team, one laptop, one day.
 
 ## Non-negotiable invariants
 
@@ -28,11 +32,15 @@ runtime. See [`docs/repo-structure.md`](docs/repo-structure.md) for the map and
 npm test     # unit tests for the harvester, scorer and injection detection
 npm run check # tests + kit self-checks (what CI runs)
 node bin/vibecheck.mjs      # score this repo against its own rubric
+node bin/vibecheck.mjs --evidence <file>   # score an existing (e.g. merged) bundle
+node bin/merge-evidence.mjs --dir <collected> --out team/evidence.json
 node bin/leaderboard.mjs --dir <bundles>
 ```
 
 No dependencies to install — the tests use Node's built-in runner. Node 20+ is required;
-CI runs 22.
+CI runs 22. One exception: the Cursor adapter needs `node:sqlite`, which arrived in Node
+22.5. It degrades to `not-harvested` with the reason on anything older, and must keep
+doing so — that path is what stops "your Node is old" turning into "this team did no work".
 
 ## Kit-specific rules
 
@@ -51,14 +59,15 @@ CI runs 22.
    leaving it stale makes it a false statement, not merely an out-of-date one. Adding the
    judging pass once made it claim "nothing is uploaded anywhere" while excerpts were
    being sent to a model. Also check whether the new data needs redacting — anything
-   written into `evidence.json` can reach a coach's screen and a model's context.
+   written into `evidence.json` can reach a facilitator's screen and a model's context.
 4. **Do not ship teams anything the rubric scores.** The kit gives templates and the
    rubric, never a finished harness. A pre-made instruction layer installed on their
-   machine would hand out Context & Harness points for free and remove the learning. This
+   machine would hand out Context & Understanding points for free and remove the learning. This
    is why the old meta-skill was deleted — don't reintroduce it.
 5. **Keep it lean.** Before adding a skill, file or dimension, ask whether it adds a
    deterministic check, an enforced sequence, or a reusable non-inferable procedure. If
-   not, it doesn't belong. Teams have 8–16 hours; every page they must read costs them.
+   not, it doesn't belong. Teams have between half a day and two days; every page they
+   must read costs them.
 6. **Canonical vs. bundled copies must stay in sync.** `plugin/agents/` mirrors
    `03-agent-setup/agents/`. When you edit one side, diff and update the other — the only
    expected differences are relative link paths.
@@ -83,7 +92,22 @@ CI runs 22.
    makes symlinked, junctioned and case-differing repo paths silently unreadable. Both
    mistakes were made here, and both ended with a team told to rotate a credential it had
    never committed. When a git query cannot be trusted, return null and fall open.
-11. **Scan only what a reader actually reads.** The judging pass opens `evidence.json` and
+11. **Nothing in the rubric may name a specific event.** Weights, criteria and the
+   default docs describe properties any project can have; what "it works" means for one
+   brief belongs in that event's acceptance checklist, supplied per event, with worked
+   examples under `docs/examples/`. The kit is used at more than one camp and must survive
+   the next one without a fork.
+12. **A counting criterion scales with observed volume, never below its baseline.** See
+   `scaledThreshold`. Five people over two days clear any absolute tuned for one person's
+   day, which is how Working Method and Verification stopped discriminating; but a rate
+   that can drop below the old absolute quietly punishes solo teams instead. Both
+   directions have a test, and a change here needs both.
+13. **A criterion a person settles is `not-harvested` until they settle it — never zero,
+   and never inferred.** `privacy-of-sample-data` is the sharp case: detecting "real
+   personal data" means pattern-matching names and emails in a team's fixtures, and
+   `ana@example.com` looks exactly like a real address. Rule 9 applies with more force
+   here, not less.
+14. **Scan only what a reader actually reads.** The judging pass opens `evidence.json` and
    nothing else, so the scan covers the instruction layer — prose an agent reads as
    direction — plus the excerpts. Source code, stylesheets, HTML templates and SQL are out
    of scope on purpose. Widening the scope is how the false positives happened.
@@ -101,4 +125,10 @@ CI runs 22.
   and parses. CI checks this too — see
   [`.github/workflows/kit-check.yml`](.github/workflows/kit-check.yml).
 - Touched the rubric: confirm the six weights still sum to 100 and that no other file
-  states an old weight.
+  states an old weight, and bump `SCORER_VERSION` — a weight change makes old scores
+  incomparable, and the leaderboard prints the version so an event can prove it did not
+  move mid-way.
+- Touched an adapter: the format belongs to somebody else and moves without warning, so
+  add the shape you are handling to `tests/adapters.test.mjs` alongside a malformed and a
+  wrong-repo case. An adapter that silently reads nothing does not throw; it just deletes
+  a team's evidence.
