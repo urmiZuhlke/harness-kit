@@ -27,16 +27,16 @@ is generated from the same file the scorer uses, so the two cannot drift apart.
 ## If you are a team of more than one
 
 Your AI transcripts live in your own home directory, so a check run on one laptop measures
-one person. **Every member harvests, then you merge:**
+one person and calls it the team. **Everyone runs the same command with the same team
+name:**
 
 ```bash
-node bin/vibecheck.mjs --harvest-only          # each member, in the team's repo
-node bin/merge-evidence.mjs --dir collected --out team/evidence.json
-node bin/vibecheck.mjs --evidence team/evidence.json
+node bin/vibecheck.mjs --team "Your Team Name"
 ```
 
-The merge unions everyone's sessions and recalculates every total from them. Skip it and
-four fifths of your team's work is invisible to the score.
+It writes one file each, and the team name inside links them. They are combined into one
+score when a facilitator collects them. Skip it and four fifths of your team's work is
+invisible to the score.
 
 **Transcripts can be read from Claude Code, GitHub Copilot in VS Code, Codex CLI and
 Cursor.** Using something else costs you nothing directly — those criteria are reported as

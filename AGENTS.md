@@ -31,10 +31,11 @@ because a previous version of the kit assumed one team, one laptop, one day.
 ```bash
 npm test     # unit tests for the harvester, scorer and injection detection
 npm run check # tests + kit self-checks (what CI runs)
-node bin/vibecheck.mjs      # score this repo against its own rubric
-node bin/vibecheck.mjs --evidence <file>   # score an existing (e.g. merged) bundle
-node bin/merge-evidence.mjs --dir <collected> --out team/evidence.json
-node bin/leaderboard.mjs --dir <bundles>
+node bin/vibecheck.mjs                     # score this repo against its own rubric
+node bin/vibecheck.mjs --team "Name"        # ...and write one file to hand in
+node bin/leaderboard.mjs --dir <collected>  # group by team, merge members, rank
+node bin/vibecheck.mjs --evidence <file>    # score one existing bundle
+node bin/merge-evidence.mjs --dir <dir> --out <file>   # merge by hand, rarely needed
 ```
 
 No dependencies to install — the tests use Node's built-in runner. Node 20+ is required;
@@ -107,7 +108,19 @@ doing so — that path is what stops "your Node is old" turning into "this team 
    personal data" means pattern-matching names and emails in a team's fixtures, and
    `ana@example.com` looks exactly like a real address. Rule 9 applies with more force
    here, not less.
-14. **Scan only what a reader actually reads.** The judging pass opens `evidence.json` and
+14. **A participant runs one command, and a facilitator runs one command.** Every step
+   beyond that is a step a hundred people take under time pressure on a day nobody can
+   repeat. The team workflow was once harvest, collect into named folders, merge, then
+   score; four steps and a naming convention, of which the middle two were pure ceremony.
+   Before adding a step to either side, work out how it can be a flag on the command that
+   already exists.
+15. **Only what the judge reads leaves the machine.** `judgingBundle` is the one place a
+   team's evidence reaches a model, and it carries the harness, context and prompt
+   excerpts and nothing else — no committer names, repository paths, branch names, test
+   output or credential locations. If you add a field the judge needs, add it there
+   explicitly; if you add one it does not, it must not appear. `tests/handover.test.mjs`
+   asserts the absences by string, so a field smuggled back in fails the build.
+16. **Scan only what a reader actually reads.** The judging pass opens `evidence.json` and
    nothing else, so the scan covers the instruction layer — prose an agent reads as
    direction — plus the excerpts. Source code, stylesheets, HTML templates and SQL are out
    of scope on purpose. Widening the scope is how the false positives happened.

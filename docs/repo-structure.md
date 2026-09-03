@@ -7,14 +7,15 @@ Reference for anyone changing the kit. To just use it, read the
 harness-kit/
 ├── README.md                          ← what this is, for teams and for facilitators
 ├── bin/
-│   ├── vibecheck.mjs                  ← harvest a repo and score it (also --evidence)
-│   ├── merge-evidence.mjs             ← combine several members' harvests into a team bundle
-│   └── leaderboard.mjs                ← rank every team, recomputed from their evidence
+│   ├── vibecheck.mjs                  ← what a participant runs: --team writes one file
+│   ├── leaderboard.mjs                ← what a facilitator runs: group, merge, rank
+│   └── merge-evidence.mjs             ← merge by hand; the leaderboard does it for you
 ├── lib/
 │   ├── harvest/                       ← repo, git, journal + one adapter per AI tool
 │   │   ├── adapters/                  ← claude-code · copilot · codex · cursor
 │   │   └── merge.mjs                  ← union sessions, re-derive every total
 │   ├── score/                         ← dimensions.mjs is the rubric as code
+│   │   └── judging-bundle.mjs         ← the only thing that reaches a model
 │   ├── integrity/injection.mjs        ← notes for a facilitator; moves no number
 │   └── report/                        ← report.html and the leaderboard page
 ├── docs/

@@ -27,23 +27,21 @@ published up front. Nothing is hidden.
 They are starting points, not answers. An unmodified template scores close to zero —
 the rubric rewards *your* project's real rules, commands and constraints.
 
-**3. Check yourself, as often as you like.**
+**3. Check yourself, as often as you like.** One command, in a terminal — it is a plain
+script, not an AI:
 
 ```bash
-node bin/vibecheck.mjs
+node bin/vibecheck.mjs --team "Your Team Name"
 ```
 
 It reads your repo, your git history and your AI chat transcripts — locally — and writes
 `.vibecheck/report.html` with your score and what to do next, ranked by what it is worth.
+It also writes **one file to hand in**, and prints its path.
 
-**4. If you are more than one person, merge your evidence.** Transcripts live in each
-person's home directory, so a check on one laptop scores one person and calls it the team:
-
-```bash
-node bin/vibecheck.mjs --harvest-only              # each member, in the team's repo
-node bin/merge-evidence.mjs --dir collected --out team/evidence.json
-node bin/vibecheck.mjs --evidence team/evidence.json
-```
+**Every member of the team runs that same command with the same team name.** Transcripts
+live in each person's home directory, so a check on one laptop measures one person and
+calls it the team; the team name inside each file is what links your laptops together
+later. Commit `.vibecheck/` so the file travels with your repository.
 
 Transcripts can be read from **Claude Code, GitHub Copilot in VS Code, Codex CLI and
 Cursor**. Anything else is reported as unassessed rather than failed — run `/journal` at
@@ -59,14 +57,21 @@ milestones as your fallback.
 - [`docs/acceptance-checklist.template.json`](docs/acceptance-checklist.template.json) —
   write this from your event's brief; it is 5 of the 100 points
 - [`docs/intro-outline.md`](docs/intro-outline.md) — a 30-minute kickoff outline
-- Leaderboard across every team:
+- Leaderboard across every team. Collect every file everyone handed in into one flat
+  folder — no subfolders to make, no renaming — and run:
 
 ```bash
-node bin/leaderboard.mjs --dir bundles --html leaderboard.html
+node bin/leaderboard.mjs --dir collected --html leaderboard.html
 ```
 
-It recomputes each score from the team's `evidence.json` and ignores whatever
-`score.json` a bundle contains, so a team editing their own score changes nothing.
+Files are grouped by the team name stamped inside them, several members of one team are
+merged into one score automatically, and each score is recomputed from the evidence, so a
+team editing their own `score.json` changes nothing. Your own per-team files go in the
+same folder as `<team-slug>.scorecard.json` and `<team-slug>.judgement.json`.
+
+The run also writes `collected/judging/<team>.json` — one small file per team holding only
+the excerpts `/facilitator-judge` reads. Judge from those: they leave out the committer
+names, repository paths, branch names and test output that a judgement does not depend on.
 
 ## What this measures
 

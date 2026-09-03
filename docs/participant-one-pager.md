@@ -30,7 +30,9 @@ your evidence shows, and never falls below what one person's day is held to.
 
 ## How the score is produced
 
-Run it yourself, any time, unlimited:
+**It is a plain script, not an AI.** It reads files, counts things and writes a report. No
+agent, no chatbot, no prompt — the same input always gives the same number. Run it in a
+terminal as often as you like:
 
 ```bash
 node bin/vibecheck.mjs
@@ -54,18 +56,24 @@ independently — editing your own `score.json` changes nothing.
 
 ## If you're a team of more than one — read this bit
 
-Your transcripts are in *your* home directory. A check run on one laptop scores one
-person's day and calls it the team. So: **every member harvests, one person merges.**
+Your AI transcripts live in *your own* home directory, not in the repo. A check run on one
+laptop therefore scores one person's day and calls it the team — and nothing in the output
+looks wrong when that happens.
+
+So **every member runs the same one command, with the same team name**:
 
 ```bash
-node bin/vibecheck.mjs --harvest-only              # each of you, in the team's repo
-# collect the evidence.json files into one folder, one subfolder per person
-node bin/merge-evidence.mjs --dir collected --out team/evidence.json
-node bin/vibecheck.mjs --evidence team/evidence.json
+node bin/vibecheck.mjs --team "Your Team Name"
 ```
 
-Do this once mid-way so you find out early if someone's tool can't be read, and again at
-hand-in.
+That writes **one file** to hand in — the path is printed at the end, and the team name
+inside it is what links your laptops together. Spell the team name the same way each time;
+everything else is handled for you. Commit `.vibecheck/` so the file travels with your
+repository, and hand in the repository link.
+
+Do this once mid-way too, not only at the deadline: it is how you find out early that
+someone's tool can't be read, which is a five-minute problem on day one and an unfixable
+one at 14:00.
 
 **Transcripts can be read from:** Claude Code, GitHub Copilot in VS Code, Codex CLI, and
 Cursor. Using something else costs you nothing directly — those criteria come back
@@ -92,11 +100,10 @@ than silently finding nothing.)*
   on this machine and your branch names; the names of the tools your agent called; and up
   to 4,000 characters of whatever your test command last printed, with credential-shaped
   strings replaced by `[redacted]`.
-- **In a merged team bundle, additionally:** the label of each member's harvest — which is
-  the folder name you filed it under, so name those folders however you're comfortable
-  being identified — along with each member's repo path on their own machine, when they
-  harvested, and how many sessions and prompts they contributed. That per-member breakdown
-  is the audit trail for a merged score, and it is visible to anyone who opens the bundle.
+- **Your team name and who ran the check**, from `--team` and your git `user.name`. On a
+  merged team bundle this becomes a per-member breakdown: who contributed, from which repo
+  path on their own machine, when, and how many sessions and prompts each. That is the
+  audit trail for a merged score, and it is visible to anyone who opens the file.
 - **About that test output:** a failing suite often prints file paths and the lines of code
   around the failure, so we can't promise no source code ever appears there. Read it
   yourself in `evidence.json` if that matters to you.
@@ -107,17 +114,21 @@ than silently finding nothing.)*
 
 **One thing does leave your machine.** Three of the 100 points' worth of criteria — is your
 harness substantive, did your prompts show real decomposition, do your context documents
-record the real problem — are judged by a facilitator running an AI judging pass. **That
-step sends your whole `evidence.json`** to an AI model: everything listed above — prompt
-excerpts, your instruction and context files with credentials redacted, credential
-locations, committer names, your repo path and branch names, the per-member breakdown if
-it's a merged bundle, the tool names your agent called, filenames and counts, and your last
-test run's output. The whole of that one file, not a selection from it. It is a plain JSON
-file sitting in your repo, so open it before you agree: what you read there is exactly what
-gets sent.
+record the real problem — cannot be settled by counting, so a facilitator judges them with
+an AI model. That is the only step where anything about you reaches a model, and it sends
+a **separate, trimmed file**, not your evidence:
 
-The rest of the scoring is a local script and stays local. If any of that matters to you,
-tell a facilitator and they'll score those three criteria by hand instead.
+- **Sent:** your harness and context file excerpts (credentials already redacted), your
+  prompt excerpts, your team name, your repository's *name*, and three counts — how many
+  prompts, sessions and people the excerpts are drawn from.
+- **Not sent:** the names on your commits, the path to the repository on anyone's laptop,
+  your branch names, your test output, the locations of anything credential-shaped, the
+  names of the tools your agent called, and the per-member breakdown.
+
+The facilitator's own command writes that file, so it is what they judge from. It is plain
+JSON and you can ask to see yours. Everything else about scoring is a local script and
+stays local. If even the trimmed file matters to you, tell a facilitator and they'll score
+those three criteria by hand instead — that option is yours, not a favour.
 
 ## A warning, in good faith
 

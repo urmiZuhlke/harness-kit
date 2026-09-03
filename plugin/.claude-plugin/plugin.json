@@ -1,7 +1,7 @@
 {
   "name": "harness-kit",
   "description": "harness-kit — the workshop agent roster (Planner, Implementer, Reviewer, Explore) and the /harness-kit scaffolding skill, usable from any repository.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": {
     "name": "harness-kit"
   },

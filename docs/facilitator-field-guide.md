@@ -69,45 +69,80 @@ facilitating, you are walking.
   ([template](facilitator-scorecard.template.json)). Ask where their seed data came from
   and record the privacy check. Award any badges.
 
-## Teams are more than one person — so is their evidence
+## The whole workflow, both sides
 
-**This is the thing most likely to go wrong on the day.** AI transcripts live in each
-person's home directory. A check run on one laptop measures one person and reports it as
-the team, and nothing about the output looks wrong.
+**Each person, once, in a terminal.** It is a plain script — no AI, no agent:
 
-Each member runs `node bin/vibecheck.mjs --harvest-only` in the team's repo. Someone
-collects the files into one folder per person and runs `node bin/merge-evidence.mjs --dir
-collected --out team/evidence.json`, then `node bin/vibecheck.mjs --evidence
-team/evidence.json`. The merge prints one line per member — **read it**: a member with zero
-sessions either used a tool the kit cannot read or never harvested, and both are worth
-knowing before you rank anyone.
+```bash
+node bin/vibecheck.mjs --team "Their Team Name"
+```
 
-Have every team do this once mid-way, not only at hand-in. Discovering at 13:55 that one
-person's tool produced nothing is a problem; discovering it on day one is a five-minute fix.
+That writes one file to hand in and prints its path. Everyone on a team uses the same team
+name; that name is what links their laptops together.
+
+**You, once.** Collect every file from every team into one flat folder and run:
+
+```bash
+node bin/leaderboard.mjs --dir collected --html leaderboard.html
+```
+
+Files are grouped by team name and members are merged automatically. Your own per-team
+files live in the same folder: `<team-slug>.scorecard.json` (demo, checklist, privacy,
+badges) and `<team-slug>.judgement.json` (written by `/facilitator-judge`).
+
+**Read the "Ppl" column.** It says how many people each team's score actually covers. A
+team of five showing 1 was scored on one laptop, and nothing else in the output looks
+wrong — the leaderboard names those teams explicitly underneath. Chase the missing files
+before you rank anyone.
+
+**Have every team run it once mid-way, not only at hand-in.** Discovering at 13:55 that
+one person's tool produced nothing is a problem; discovering it on day one is a five-minute
+fix.
 
 ## When the authoritative snapshot is taken
 
-Harvest and merge **at the hand-in deadline**. That bundle ranks everyone and decides which
-teams go through.
+Everyone runs the command **at the hand-in deadline**, and those files rank everyone and
+decide which teams go through.
 
-Teams that continue improving after hand-in — where the event allows it — get **re-harvested
+Teams that continue improving after hand-in — where the event allows it — **run it again
 just before they present**, so the demo you score and the code you scored are the same
 thing. Say up front which of the two numbers is the ranking one, and stick to it.
 
-## Judging the criteria a script can't
+## Judging the three criteria a script can't
 
-Run `/facilitator-judge` on a team's `.vibecheck` bundle once they have transcripts and a
-harness file — no need to wait for demo time. It reads only their `evidence.json`, never
-their repo, and writes `judgement.json` beside it
-([example](judgement.example.json)). It covers three criteria: is the harness real, did the
-prompts show real decomposition, and do the context documents record the actual problem.
-Until judged, those three score from a heuristic — real numbers, usable all day — but the
-score stays **provisional**.
+**Almost nothing in this kit is AI.** The scorer is a plain script: it counts, it does not
+interpret, and the same evidence always gives the same number. Three criteria out of the
+hundred points — is the harness real, did the prompts show real decomposition, do the
+context documents record the actual problem — cannot be settled by counting, and those are
+judged by a model. Until judged they fall back to a rough heuristic, so **the kit works
+all day with no AI involved at all**; the score just stays marked **provisional**.
 
-Sending a team's `evidence.json` to a model is the one part of scoring that leaves a
-machine, and the participants have been told so in writing. Use a tool your organisation
-licenses, and if a team objects, judge those three by hand — the option is promised to them
-on their one-pager.
+Running the leaderboard writes `collected/judging/<team>.json` — a small file per team.
+Run `/facilitator-judge` on those, not on the evidence: they hold the harness, context and
+prompt excerpts and deliberately leave out the committer names, repository paths, branch
+names and test output, none of which change a judgement. The skill writes
+`<team-slug>.judgement.json` back into the collected folder
+([example](judgement.example.json)).
+
+**Two things to settle before you start:**
+
+- **One tool, one model, one person or pair, all teams, one sitting.** Not for privacy —
+  for fairness. Different models read the same evidence differently, and this is the only
+  comparability control that exists. The `model` field in the judgement is self-reported
+  and models are routinely wrong about their own version, so the control has to be
+  procedural.
+- **Which licensed tool.** It does not matter what the *teams* used — Claude, Copilot,
+  Cursor and Codex all just produce the logs the script reads. What matters is the one
+  tool *you* judge with. Use an enterprise tier your organisation licenses, not somebody's
+  personal subscription: the judging file is data about a hundred colleagues, even after
+  the trim.
+
+If a team objects to the AI step at all, judge those three by hand — that option is
+promised to them on their one-pager, and it is theirs, not a favour.
+
+**You can also skip the judging pass entirely.** Every team then keeps the heuristic
+fallback, equally, and the ranking stays internally consistent. That is a legitimate
+choice; make it deliberately rather than discovering it at 14:00.
 
 ## Which tools the kit can read
 

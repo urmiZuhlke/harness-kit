@@ -7,8 +7,9 @@
  * files but none of the process. Scoring is a separate step that reads the evidence file
  * this produces, so it can run anywhere.
  *
- *   node bin/vibecheck.mjs                 # harvest the current directory
- *   node bin/vibecheck.mjs --repo ../app   # harvest somewhere else
+ *   node bin/vibecheck.mjs                    # harvest the current directory
+ *   node bin/vibecheck.mjs --team "Team Blue" # …and write one file to hand in
+ *   node bin/vibecheck.mjs --repo ../app      # harvest somewhere else
  *   node bin/vibecheck.mjs --no-run-tests  # skip executing the test suite
  *   node bin/vibecheck.mjs --harvest-only  # collect evidence without scoring it
  *   node bin/vibecheck.mjs --evidence team/evidence.json   # score a merged team bundle
@@ -19,7 +20,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { harvest } from '../lib/harvest/index.mjs';
+import { execFileSync } from 'node:child_process';
+import { userInfo } from 'node:os';
+import { harvest, slug } from '../lib/harvest/index.mjs';
 import { score } from '../lib/score/index.mjs';
 import { renderReport } from '../lib/report/render.mjs';
 
@@ -30,12 +33,14 @@ function parseArgs(argv) {
   const args = {
     repo: process.cwd(), runTestSuite: true, testTimeoutMs: 120000,
     quiet: false, harvestOnly: false, explainIntegrity: false, evidenceFile: null,
-    repoGiven: false,
+    repoGiven: false, team: null, member: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--repo') { args.repo = argv[++i]; args.repoGiven = true; }
     else if (arg === '--evidence') args.evidenceFile = argv[++i];
+    else if (arg === '--team') args.team = argv[++i];
+    else if (arg === '--member') args.member = argv[++i];
     else if (arg === '--no-run-tests') args.runTestSuite = false;
     else if (arg === '--test-timeout') args.testTimeoutMs = Number(argv[++i]) * 1000;
     else if (arg === '--harvest-only') args.harvestOnly = true;
@@ -60,6 +65,10 @@ Run it as often as you like — this is practice mode. Facilitator-judged dimens
 provisional until a facilitator scores your demo, and nothing else changes between now and then.
 
 Options:
+  --team <name>          Your team's name. Stamps it into the result and writes one
+                         self-contained file to hand in. Use the same name on every
+                         team member's machine — that is what links you together.
+  --member <name>        Who this machine belongs to (default: your git user.name)
   --repo <path>          Repository to check (default: current directory)
   --evidence <file>      Score an existing evidence file instead of harvesting. Use this
                          on a team bundle from bin/merge-evidence.mjs. Combine it with
@@ -92,6 +101,16 @@ function bar(earned, available, width = 24) {
   if (!available) return '-'.repeat(width);
   const filled = Math.round((earned / available) * width);
   return '#'.repeat(filled) + '.'.repeat(width - filled);
+}
+
+/** Who is at this keyboard, for the handover filename. Never used for scoring. */
+function whoAmI(repo) {
+  try {
+    const name = execFileSync('git', ['config', 'user.name'],
+      { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (name) return name;
+  } catch { /* no git, or no name configured — the OS user will do */ }
+  try { return userInfo().username; } catch { return 'member'; }
 }
 
 function statusLine(name, src) {
@@ -146,6 +165,8 @@ const evidence = args.evidenceFile
     kitRoot: KIT_ROOT,
     runTestSuite: args.runTestSuite,
     testTimeoutMs: args.testTimeoutMs,
+    team: args.team,
+    member: args.team ? (args.member ?? whoAmI(repo)) : null,
   });
 
 if (!args.quiet && evidence?.merged) {
@@ -223,6 +244,17 @@ writeFileSync(scoreFile, JSON.stringify(result, null, 2) + '\n', 'utf8');
 const reportFile = join(outDir, 'report.html');
 writeFileSync(reportFile, renderReport(result, evidence), 'utf8');
 
+// One file, named so that a hundred of them can sit in one folder without colliding and
+// still be grouped by team. This is the whole handover: it is self-contained, and the
+// facilitator's leaderboard reads nothing else.
+let handoverFile = null;
+if (args.team && !args.evidenceFile && evidence.team) {
+  const member = evidence.team.member ?? 'member';
+  handoverFile = join(outDir, evidence.team.slug + '--' + (slug(member) || 'member') + '.json');
+  writeFileSync(handoverFile, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
+  writeFileSync(outFile, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
+}
+
 if (!args.quiet) {
   console.log('Score: ' + result.total + '/100'
     + (result.complete ? '' : '   (' + result.available + ' points assessable so far)')
@@ -275,6 +307,12 @@ if (!args.quiet) {
     if (sc?.surfacesTruncated) console.log('    ...more not listed');
   }
   console.log('');
+}
+
+if (handoverFile) {
+  console.log('Hand in this one file:\n  ' + handoverFile);
+  console.log('\nEveryone on your team runs the same command with the same --team name.');
+  console.log('Commit ' + OUTPUT_DIR + '/ so it travels with your repository.\n');
 }
 
 console.log(outFile);
