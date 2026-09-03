@@ -733,3 +733,123 @@ test('harness excerpts are bounded per file and in total', async () => {
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// --- JVM and .NET projects ------------------------------------------------------------
+//
+// Every assertion here is a point a team was losing for their choice of stack rather than
+// for anything they did: a Spring Boot repo reported no test command, no test files and no
+// lockfile, which is three criteria and up to 19 points against a repo that pins its
+// dependencies by construction.
+
+test('a Maven project has its test and build commands found', async () => {
+  const dir = tempRepo({ 'pom.xml': '<project><modelVersion>4.0.0</modelVersion></project>' });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.commands.test, 'mvn -q test');
+    assert.equal(r.commands.build, 'mvn -q package -DskipTests');
+    assert.equal(r.commands.testSource, 'pom.xml');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a Gradle project prefers the wrapper over a system gradle', async () => {
+  const dir = tempRepo({ 'build.gradle.kts': 'plugins { java }\n', 'gradlew': '#!/bin/sh\n' });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.match(r.commands.test, /gradlew(?:\.bat)? test$/,
+      'the wrapper pins the version the team actually built with');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a Gradle project with no wrapper falls back to a system gradle', async () => {
+  const dir = tempRepo({ 'build.gradle': 'plugins { id "java" }\n' });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.commands.test, 'gradle test');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a .NET solution has its test, build and restore commands found', async () => {
+  const dir = tempRepo({
+    'Booking.sln': 'Microsoft Visual Studio Solution File\n',
+    'Booking/Booking.csproj': '<Project Sdk="Microsoft.NET.Sdk"></Project>',
+  });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.commands.test, 'dotnet test');
+    assert.equal(r.commands.build, 'dotnet build');
+    assert.equal(r.commands.setup, 'dotnet restore');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('JVM and .NET test classes are counted as tests', async () => {
+  const dir = tempRepo({
+    'pom.xml': '<project/>',
+    'src/test/java/com/acme/BookingTest.java': 'class BookingTest {}',
+    'Booking.Tests/BookingServiceTests.cs': 'public class BookingServiceTests {}',
+    'src/main/java/com/acme/Booking.java': 'class Booking {}',
+  });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.tests.testFileCount, 2, 'both test classes count; the source class does not');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a project file inside a test directory is not counted as a test', async () => {
+  // Booking.Tests/Booking.Tests.csproj matched the directory rule and reported a project
+  // with one test class as having two.
+  const dir = tempRepo({
+    'Booking.Tests/Booking.Tests.csproj': '<Project Sdk="Microsoft.NET.Sdk"></Project>',
+    'Booking.Tests/BookingServiceTests.cs': 'public class BookingServiceTests {}',
+  });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.tests.testFileCount, 1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('an ordinary file whose name ends in "test" is not counted as a test', async () => {
+  // `latest.java` ends in "test" + ".java"; only the case-sensitive rule keeps it out.
+  const dir = tempRepo({ 'src/main/java/com/acme/latest.java': 'class latest {}' });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.tests.testFileCount, 0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a Maven manifest counts as a dependency pin', async () => {
+  const dir = tempRepo({ 'pom.xml': '<project><dependencies/></project>' });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.reproducibility.lockfilePresent, true,
+      'a Maven dependency without a version does not resolve — the manifest is the pin');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a .NET project file anywhere counts as a dependency pin', async () => {
+  const dir = tempRepo({ 'src/Booking/Booking.csproj': '<Project><PackageReference Version="1.2.3" /></Project>' });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.reproducibility.lockfilePresent, true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a repo with no manifest at all is still reported as unpinned', async () => {
+  const dir = tempRepo({ 'README.md': '# nothing here\n' });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.reproducibility.lockfilePresent, false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a credential in a Spring properties file is found', async () => {
+  // .properties and .xml were outside the scanned extensions, so the single most likely
+  // place for a hardcoded JVM credential was never read.
+  const dir = tempRepo({
+    'src/main/resources/application.properties':
+      'spring.datasource.password="hunter2hunter2hunter2"\n',
+  });
+  try {
+    const r = await harvestRepo(dir, { kitRoot: KIT_ROOT, runTestSuite: false });
+    assert.equal(r.safety.secretFindings.offered, 1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

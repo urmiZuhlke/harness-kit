@@ -10,6 +10,8 @@
  *   node bin/vibecheck.mjs                 # harvest the current directory
  *   node bin/vibecheck.mjs --repo ../app   # harvest somewhere else
  *   node bin/vibecheck.mjs --no-run-tests  # skip executing the test suite
+ *   node bin/vibecheck.mjs --harvest-only  # collect evidence without scoring it
+ *   node bin/vibecheck.mjs --evidence team/evidence.json   # score a merged team bundle
  *
  * Everything happens locally. Nothing is uploaded, and no raw transcript is copied into
  * the output — only counts, classifications and short bounded excerpts.
@@ -27,11 +29,12 @@ const OUTPUT_DIR = '.vibecheck';
 function parseArgs(argv) {
   const args = {
     repo: process.cwd(), runTestSuite: true, testTimeoutMs: 120000,
-    quiet: false, harvestOnly: false, explainIntegrity: false,
+    quiet: false, harvestOnly: false, explainIntegrity: false, evidenceFile: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--repo') args.repo = argv[++i];
+    else if (arg === '--evidence') args.evidenceFile = argv[++i];
     else if (arg === '--no-run-tests') args.runTestSuite = false;
     else if (arg === '--test-timeout') args.testTimeoutMs = Number(argv[++i]) * 1000;
     else if (arg === '--harvest-only') args.harvestOnly = true;
@@ -57,6 +60,8 @@ provisional until a coach scores your demo, and nothing else changes between now
 
 Options:
   --repo <path>          Repository to check (default: current directory)
+  --evidence <file>      Score an existing evidence file instead of harvesting. Use this
+                         on a team bundle from bin/merge-evidence.mjs.
   --no-run-tests         Do not execute the detected test command
   --test-timeout <secs>  Timeout for the test run (default: 120)
   --harvest-only         Collect evidence without scoring it
@@ -97,20 +102,35 @@ if (args.help) { help(); process.exit(0); }
 
 const repo = resolve(args.repo);
 if (!args.quiet) {
-  console.log('vibecheck — harvesting ' + repo);
-  if (args.runTestSuite) console.log('  (will run the test suite if one is detected; --no-run-tests to skip)');
+  if (args.evidenceFile) {
+    console.log('vibecheck — scoring ' + resolve(args.evidenceFile));
+  } else {
+    console.log('vibecheck — harvesting ' + repo);
+    if (args.runTestSuite) console.log('  (will run the test suite if one is detected; --no-run-tests to skip)');
+  }
 }
 
-const evidence = await harvest(repo, {
-  kitRoot: KIT_ROOT,
-  runTestSuite: args.runTestSuite,
-  testTimeoutMs: args.testTimeoutMs,
-});
+// Scoring an existing file is the merged-team path: the harvest already happened, once
+// per machine, and re-running it here would throw away every other member's evidence.
+const evidence = args.evidenceFile
+  ? JSON.parse(readFileSync(resolve(args.evidenceFile), 'utf8'))
+  : await harvest(repo, {
+    kitRoot: KIT_ROOT,
+    runTestSuite: args.runTestSuite,
+    testTimeoutMs: args.testTimeoutMs,
+  });
 
-const outDir = join(repo, OUTPUT_DIR);
+if (!args.quiet && evidence?.merged) {
+  console.log('  merged from ' + evidence.merged.memberCount + ' machine(s): '
+    + evidence.merged.members.map((m) => m.label).join(', '));
+}
+
+// A merged bundle's report belongs beside the bundle, not inside whichever repo the
+// command happened to be run from.
+const outDir = args.evidenceFile ? dirname(resolve(args.evidenceFile)) : join(repo, OUTPUT_DIR);
 mkdirSync(outDir, { recursive: true });
-const outFile = join(outDir, 'evidence.json');
-writeFileSync(outFile, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
+const outFile = args.evidenceFile ? resolve(args.evidenceFile) : join(outDir, 'evidence.json');
+if (!args.evidenceFile) writeFileSync(outFile, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
 
 if (!args.quiet) {
   console.log('\nSources:');
@@ -151,7 +171,9 @@ if (args.harvestOnly) {
 }
 
 const result = score(evidence, {
-  repoPath: repo,
+  // A merged bundle carries the repo path from the member machine it came from, which may
+  // not exist here. The repo actually in front of us wins when we harvested one.
+  repoPath: args.evidenceFile ? (evidence?.repo?.path ?? repo) : repo,
   kitRoot: KIT_ROOT,
   coachScorecard: readBundleFile(outDir, 'coach-scorecard.json'),
   judgement: readBundleFile(outDir, 'judgement.json'),
