@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { harvestCodex } from '../lib/harvest/adapters/codex.mjs';
+import { isPlanningTool } from '../lib/harvest/adapters/copilot.mjs';
 import { commandFrom, harvestCursor } from '../lib/harvest/adapters/cursor.mjs';
 import { editorStorageRoots, makeIsInRepo, workspaceFolderOf } from '../lib/harvest/shared.mjs';
 
@@ -356,4 +357,21 @@ test('editor storage roots are found per platform, and only when they exist', ()
     // The same call on another platform looks somewhere else and finds nothing.
     assert.deepEqual(editorStorageRoots(['Cursor'], { platform: 'linux', env, home }), []);
   } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test('Copilot planning tools are recognised, and ordinary tools are not', () => {
+  // This adapter counted no planning signals at all, so `planned-before-building` was
+  // capped for every Copilot team however they worked. Both directions are asserted
+  // because the first attempt at this pattern matched `deploy_plan_checker`, and the
+  // second wrote `planner?` — which makes only the final `r` optional, so it matched
+  // "planne" and missed "plan".
+  for (const tool of ['manage_todo_list', 'copilot_manage_todo_list', 'todo', 'todos',
+    'update_plan', 'plan', 'planner', 'copilot-plan']) {
+    assert.equal(isPlanningTool(tool), true, tool + ' is a planning tool');
+  }
+  for (const tool of ['create_file', 'replace_string_in_file', 'run_in_terminal', 'read_file',
+    'semantic_search', 'get_errors', 'deploy_plan_checker', 'planet_data', 'todolist_export',
+    '', null, undefined]) {
+    assert.equal(isPlanningTool(tool), false, JSON.stringify(tool) + ' is not a planning tool');
+  }
 });
