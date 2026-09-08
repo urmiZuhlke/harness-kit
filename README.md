@@ -8,6 +8,62 @@ turns their repo, their git history and their AI chat transcripts into a score o
 listing every criterion — passed and failed alike — with what was looked for, what was
 found, and what to do about it.
 
+## First, the thing that confuses everyone
+
+**This repository is not where teams work.** It is a tool they point *at* their own
+project. A team builds their booking app, or whatever the brief asks for, in their own
+repository; the kit is cloned once, separately, and run against it:
+
+```bash
+git clone https://github.com/urmiZuhlke/harness-kit.git    # once, anywhere
+cd ~/my-team/booking-app                                    # your own project
+node ~/harness-kit/bin/vibecheck.mjs --team "Team Blue"
+```
+
+Nothing is installed and there are no dependencies — Node 20+ (22.5+ to read Cursor
+history) and that is all.
+
+## How the 100 points are decided
+
+| Decided by | Points | What it means |
+| ---------- | -----: | ------------- |
+| **A plain script** | **65** | Counting. No AI anywhere. The same evidence always gives the same number, and anyone can re-run it and get it again. |
+| **An AI judging pass** | **18** | Three things counting cannot settle: is the harness real, did the prompts show real decomposition, is the problem written down. A facilitator runs this once per team. **Skip it and every team keeps an automatic fallback instead** — the kit works with no AI at all. |
+| **A person watching** | **17** | The demo (10), this event's acceptance checklist (5), and a look at whether the seed data is invented (2). A facilitator writes these into one small file per team. |
+
+Two-thirds of the score is not a matter of opinion. Teams can run the script part on
+themselves as often as they like, all day; the other 35 points wait for a facilitator and
+are clearly marked "not scored yet" until then.
+
+## The process, end to end
+
+**During the event — every team member, on their own laptop, as often as they like:**
+
+```bash
+node ~/harness-kit/bin/vibecheck.mjs --team "Team Blue"
+```
+
+Everyone on a team types the **same team name** — that is what links their laptops. Each
+run writes `.vibecheck/report.html` (their score and what to do next) and **one file to
+hand in**, whose path it prints. AI chat history lives in each person's home directory, so
+a run on one laptop measures one person: if only one member runs it, the team is scored on
+one person's day and nothing in the output looks wrong.
+
+**At hand-in:** everyone runs it once more, the team commits `.vibecheck/` and submits
+their repository link as usual. The files travel with the repo — there is nothing extra to
+upload and nowhere to push them.
+
+**Afterwards — a facilitator:** clone each team's repo, copy every `.vibecheck/*.json`
+hand-in file into **one flat folder**, and run one command:
+
+```bash
+node bin/leaderboard.mjs --dir collected --html leaderboard.html
+```
+
+Files are grouped by the team name inside them, each team's members are merged into one
+score, and every score is recomputed from the evidence — so a team editing their own
+`score.json` changes nothing.
+
 ## For teams
 
 **1. Read the rubric.** [`docs/rubric.md`](docs/rubric.md) — six dimensions, 100 points,
@@ -27,21 +83,17 @@ published up front. Nothing is hidden.
 They are starting points, not answers. An unmodified template scores close to zero —
 the rubric rewards *your* project's real rules, commands and constraints.
 
-**3. Check yourself, as often as you like.** One command, in a terminal — it is a plain
-script, not an AI:
+**3. Check yourself, as often as you like.** From your own project directory:
 
 ```bash
-node bin/vibecheck.mjs --team "Your Team Name"
+node ~/harness-kit/bin/vibecheck.mjs --team "Your Team Name"
 ```
 
 It reads your repo, your git history and your AI chat transcripts — locally — and writes
 `.vibecheck/report.html` with your score and what to do next, ranked by what it is worth.
-It also writes **one file to hand in**, and prints its path.
-
-**Every member of the team runs that same command with the same team name.** Transcripts
-live in each person's home directory, so a check on one laptop measures one person and
-calls it the team; the team name inside each file is what links your laptops together
-later. Commit `.vibecheck/` so the file travels with your repository.
+It also writes **one file to hand in**, and prints its path. See "The process, end to end"
+above; the short version is that everyone on the team runs this with the same team name,
+and you commit `.vibecheck/` so the files travel with your repository.
 
 Transcripts can be read from **Claude Code, GitHub Copilot in VS Code, Codex CLI and
 Cursor**. Anything else is reported as unassessed rather than failed — run `/journal` at
