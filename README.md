@@ -20,8 +20,8 @@ cd ~/my-team/booking-app                                    # your own project
 node ~/harness-kit/bin/vibecheck.mjs
 ```
 
-Handing in does not even need the clone — one downloaded file, below. Nothing is installed and there are no dependencies — Node 20+ (22.5+ to read Cursor
-history) and that is all.
+Handing in does not even need the clone — one shared file, below. Nothing is installed and
+there are no dependencies — Node 20+ (22.5+ to read Cursor history) and that is all.
 
 ## How the 100 points are decided
 
@@ -37,12 +37,16 @@ are clearly marked "not scored yet" until then.
 
 ## The process, end to end
 
-**At hand-in — every team member, once, on the laptop they worked on.** One downloaded file,
-run from the project folder:
+**Before the event — a facilitator:** put [`dist/collect-history.mjs`](dist/collect-history.mjs)
+somewhere every participant can download it (a shared drive, the event channel). That one
+file is all participants need — not this repository.
+
+**At hand-in — every team member, once, on the laptop they worked on.** Download that file
+and run it from the project folder:
 
 ```bash
-curl -fsSLo ~/collect-history.mjs https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs
-node ~/collect-history.mjs
+cd ~/path/to/your-project
+node ~/Downloads/collect-history.mjs
 ```
 
 No kit clone and no team name — the repository is the team. It reads that person's AI chat

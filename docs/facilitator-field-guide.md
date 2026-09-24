@@ -71,19 +71,22 @@ facilitating, you are walking.
 
 ## The whole workflow, both sides
 
-**Each person, once, in their project folder.** One downloaded file — no kit clone, no
-team name, no AI:
+**Before the event: share one file.** Put `dist/collect-history.mjs` from this repo
+somewhere every participant can download it — a shared drive, the event channel — and
+put that link in the participant material. It is the whole tool; participants never need
+this repository. After any change to the kit, run `npm run build:collector` and replace
+the shared copy.
+
+**Each person, once, in their project folder.** No kit clone, no team name, no AI:
 
 ```bash
-curl -fsSLo ~/collect-history.mjs https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs
-node ~/collect-history.mjs
+node ~/Downloads/collect-history.mjs
 ```
 
 It writes `.vibecheck/history-<their name>.json` into the project and prints the git
 commands to commit and push it. The repository is the team; each person's file carries
 their own name, so teammates never conflict. (The participant one-pager has the Windows
-version.) If the download URL is blocked, hand the file out any other way — it is
-`dist/collect-history.mjs` in this repo, and it is the whole tool.
+version.)
 
 **You, once, after the deadline.** Clone every team's repository into one folder — the
 folder name becomes the team name — and run:

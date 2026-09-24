@@ -34,8 +34,8 @@ pushes what it writes:**
 node collect-history.mjs
 ```
 
-It writes `.vibecheck/history-<your name>.json`; the participant one-pager has the download
-link and exactly what the file contains. Your repository is your team — every history file
+Your facilitators share the file. It writes `.vibecheck/history-<your name>.json`; the
+participant one-pager says exactly what the file contains. Your repository is your team — every history file
 in it is combined into one score. Skip it and your share of the team's work is invisible to
 the score.
 

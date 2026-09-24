@@ -63,18 +63,21 @@ scored on one person's work.
 
 So before the deadline, **every member** does this once, on the laptop they worked on:
 
+1. **Download `collect-history.mjs`** from the link your facilitators share. Save it
+   anywhere — your Downloads folder is fine. Keep the `.mjs` ending; if your browser
+   renamed it (to `.txt`, or `collect-history (1).mjs`), use whatever name it has.
+2. **Open a terminal in your project folder** and run it:
+
 ```bash
-# macOS / Linux — save the file anywhere, then run it from your project folder
-curl -fsSLo ~/collect-history.mjs https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs
+# macOS / Linux
 cd ~/path/to/your-project
-node ~/collect-history.mjs
+node ~/Downloads/collect-history.mjs
 ```
 
 ```powershell
 # Windows (PowerShell)
-iwr https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs -OutFile $HOME\collect-history.mjs
 cd C:\path\to\your-project
-node $HOME\collect-history.mjs
+node $HOME\Downloads\collect-history.mjs
 ```
 
 It is one self-contained file, it needs Node 20 or newer and nothing else, and it takes a
