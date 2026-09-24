@@ -1,7 +1,6 @@
 ---
 name: planner
-description: 'Turns a raw feature idea into challenged, validated requirements, groups them into stories, and writes each as a properly structured GitHub issue. Also refines an existing issue for quality and completeness. Use when analyzing a feature, breaking work into stories, writing a new GitHub issue, or refining an existing one.'
-disable-model-invocation: true
+description: 'Turns a raw feature idea into challenged, validated requirements, groups them into stories, and writes each as a properly structured GitHub issue. Also refines an existing issue for quality and completeness. Use when analyzing a feature, breaking work into stories, writing a new GitHub issue, or refining an existing one. Invoke it when the user asks for the planner by name in any wording — "/planner", "use planner", "switch to the planner" — and never on your own initiative.'
 argument-hint: '[feature description, or an existing issue number to refine]'
 model: opus
 ---

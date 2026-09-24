@@ -6,11 +6,15 @@ Reference for anyone changing the kit. To just use it, read the
 ```
 harness-kit/
 ├── README.md                          ← what this is, for teams and for facilitators
+├── .claude/                           ← facilitator-only, used in this repo: /camp-evaluate
+│   ├── skills/camp-evaluate/          ← one judge per team in parallel, then the results table
+│   └── agents/                        ← camp-judge · camp-calibrator
 ├── bin/
 │   ├── collect-history.mjs            ← participant hand-in: writes .vibecheck/history-<me>.json
 │   ├── vibecheck.mjs                  ← self-check; --team writes the older hand-in file
 │   ├── leaderboard.mjs                ← what a facilitator runs: --repos <clones>, rank
-│   └── merge-evidence.mjs             ← merge by hand; the leaderboard does it for you
+│   ├── merge-evidence.mjs             ← merge by hand; the leaderboard does it for you
+│   └── camp/                          ← AI-judged events: pull → prepare → /camp-evaluate → report
 ├── dist/
 │   └── collect-history.mjs            ← GENERATED single file participants download
 ├── lib/
@@ -20,7 +24,8 @@ harness-kit/
 │   │   ├── redact.mjs                 ← credential patterns; masks every excerpt
 │   │   └── merge.mjs                  ← union sessions, re-derive every total
 │   ├── score/                         ← dimensions.mjs is the rubric as code
-│   │   └── judging-bundle.mjs         ← the only thing that reaches a model
+│   │   └── judging-bundle.mjs         ← the only thing that reaches a model (kit rubric)
+│   ├── camp/                          ← event rubric parser, scorecard schema, facts, results, review.html
 │   ├── integrity/injection.mjs        ← notes for a facilitator; moves no number
 │   └── report/                        ← report.html and the leaderboard page
 ├── docs/

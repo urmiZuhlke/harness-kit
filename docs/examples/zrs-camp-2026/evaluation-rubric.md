@@ -7,15 +7,17 @@ with no human in the loop until the top five are reviewed.
 | Input | Where it is | Code |
 | ----- | ----------- | ---- |
 | Proposal deck, ≤10 slides, as PDF (a PPTX is not read) | `submission/proposal.pdf` | **D** |
-| AI SDLC diagram — the brief requires it in the deck | the deck slide(s) that hold it | **G** |
+| AI SDLC diagram, as its own image (PNG or JPEG) | `submission/sdlc-diagram.png` (or `.jpg`); fallback: the deck slide(s) that hold it | **G** |
 | Repository: harness, docs, code, tests, git history | the repo itself | **R** |
 | AI chat history, one file per member | `.vibecheck/history-*.json` | **H** |
 
-Teams upload nothing beyond the deck and the history files; everything else is what is
-already in their repository.
+Teams upload nothing beyond the deck, the diagram image and the history files; everything
+else is what is already in their repository. The diagram is read from its own file first,
+because one image holding only the diagram is read far more reliably than a diagram found
+among ten slides; a team that only put it in the deck is judged from the deck instead.
 
-**Split:** 64 points come from the deck (including its diagram), 36 from repo and chat
-history. That
+**Split:** 64 points come from the deck and the diagram, 36 from repo and chat history.
+That
 mirrors the brief — four of its six areas are about the offer — while giving the part the
 brief calls most important, the Agentic SDLC, evidence the deck cannot fake.
 
@@ -47,14 +49,14 @@ hybrid work with uneven demand and unused bookings, one office now and multiple 
 | ID | Pts | Full marks when |
 | -- | --: | --------------- |
 | A1 | 5 | The client's problem is restated in the client's terms with the specifics that matter: hybrid work, uneven weekly demand, booked-but-unused desks/parking, the office size, growth to multi-office and 5,000 users, the Microsoft 365 / Entra environment. |
-| A2 | 5 | Success is **measurable**: named KPIs with targets or baselines (e.g. no-show rate, utilisation, time to book, adoption), and the affected users (employees, workplace admins) are identified. |
-| A3 | 5 | Business value is argued or quantified for *this* client, and "why us" differentiators are tied to the client's problem rather than generic claims about AI or quality. |
+| A2 | 5 | Success is **measurable**: named KPIs, each with a **baseline and a target** (e.g. no-show rate from 25% to under 8%; utilisation, time to book, adoption), and the affected users (employees, workplace admins) are identified. Targets without baselines are **Most** at best. |
+| A3 | 5 | Business value is **quantified** for *this* client (desks or parking recovered, hours or money saved, adoption), and "why us" differentiators are tied to the client's problem rather than generic claims about AI or quality. Value argued but not quantified is **Most** at best. |
 
 ## B. Proposal quality and ability to convince — 15 (D)
 
 | ID | Pts | Full marks when |
 | -- | --: | --------------- |
-| B1 | 4 | Structure: ≤10 slides, slide 1 is the Executive Summary, and the ten recommended topics are all covered (combining or reordering is fine). Deduct per missing topic. *Slide count and slide-1 title are pre-extracted facts.* |
+| B1 | 4 | Structure: ≤10 slides, slide 1 is the Executive Summary, and the ten recommended topics are all covered (combining or reordering is fine). Deduct per missing topic. *Slide count is a pre-extracted fact; the judge reads slide 1's title from the deck.* |
 | B2 | 4 | One story: the PoC validates assumptions or risks the proposal names, and the delivery plan follows from both. |
 | B3 | 4 | Reads as a client offer — clear, specific, no placeholders, no internal-report tone, no filler. |
 | B4 | 3 | The Executive Summary alone convinces: need, recommendation, value, why this team, headline price/timeline. |
@@ -101,17 +103,28 @@ the history shows, not about the facilitators executing anything.
 | -- | --: | --------------- |
 | E1 | 4 | A credible target architecture: components and data, Entra ID sign-in, Teams/email notifications, a vendor-neutral check-in event interface, multi-office with local time zones, a stated approach to 5,000+ users. (D) |
 | E2 | 3 | Security, privacy and reliability addressed specifically: server-side permissions, secret management, data minimisation and retention, idempotent/out-of-order event handling, backup/recovery targets. (D) |
-| E3 | 3 | The PoC practises it: no committed secrets (pre-extracted scan), permissions enforced server-side in code, synthetic data only. (R) |
+| E3 | 3 | The PoC practises it: no committed secrets (pre-extracted scan), permissions enforced server-side in code, synthetic data only. A committed credential (a secret-scan finding in a tracked file) caps E3 at **Some**. (R) |
 
 ## F. Delivery plan, estimate, risks and assumptions — 10 (D)
 
 | ID | Pts | Full marks when |
 | -- | --: | --------------- |
 | F1 | 3 | Roadmap and team: phases, milestones, roles, governance and client involvement. |
-| F2 | 4 | Commercials: person-days × EUR 800 add up (**check the arithmetic**), duration stated, relevant third-party costs included (cloud, licences, AI tooling), and the estimate is plausible for the *full* scope rather than the PoC. |
+| F2 | 4 | The investment is stated and makes sense: total price (person-days at EUR 800) and duration, relevant third-party costs (cloud, licences, AI tooling), and an effort that is **realistic for the full scope** rather than the PoC — enough people and time for the phases and roles the plan names. An estimate that shows where it saves cost (phasing, reuse, AI-assisted delivery) while staying realistic is the strongest. |
 | F3 | 3 | Risks and assumptions are specific, each with a mitigation, and a concrete recommended next step closes the offer. |
 
 ---
+
+**Telling good from best.** A2, A3 and E3 are worded so that the difference between a good
+offer and the best one costs points: a KPI needs its baseline, business value needs a
+number, and a committed credential costs two of E3's three points. A score of "Most" costs
+only one point on most sub-criteria, so without this two strong teams tie on criteria where
+one of them is clearly better.
+
+**F2 is not a price competition.** A cheaper offer earns more only when the saving is
+explained and the effort can still deliver the scope; a figure too low to deliver it (a few
+person-days for a multi-office system) is unrealistic and scores **None**, never as a
+bargain. The arithmetic is not audited — the question is whether the total is believable.
 
 ## Totals and checks
 
@@ -127,8 +140,12 @@ area; the report script must fail if any score exceeds its max or areas do not s
   D1, E1–E2 score 0 with the remark "no proposal PDF found". If a PDF exists elsewhere in
   the repo, `prepare.mjs` reports it and the judge uses it, with the remark "proposal not
   at submission/proposal.pdf" — a misplaced file costs no points, a missing one does.
-  No SDLC diagram in the deck: C1 scores 0 with the remark "no SDLC diagram in the
-  proposal", and C2 and C6 are judged from the slides' text alone.
-- **Compare, don't drift.** After every team is scored, one calibration pass reads all
-  scorecards side by side and corrects any sub-criterion where similar evidence received
-  different points, recording each change and why.
+  No diagram image at `submission/sdlc-diagram.png` (or `.jpg`): an image elsewhere whose
+  name says it is the diagram is used, and otherwise the judge finds the diagram slide in
+  the deck — neither costs points. No diagram in either: C1 scores 0 with the remark "no
+  SDLC diagram submitted", and C2 and C6 are judged from the slides' text alone.
+- **Anchors, not impressions.** Every team is scored against the same anchored levels
+  from the same kind of facts, and a card whose level and points disagree is rejected and
+  re-done. Humans then review the top five. A calibration pass that compares all
+  scorecards side by side is available but optional: in the rehearsal it moved scores by
+  about as much as run-to-run noise and never changed the ranking.

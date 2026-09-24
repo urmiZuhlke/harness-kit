@@ -32,7 +32,8 @@ nothing either — its pipeline-time OWASP checklist now lives directly in **Rev
 
 Claude Code has no `/`-invocable subagent mechanism — slash commands only exist on
 Skills. So on the Claude side, all three agents are installed as **skills**
-(`/planner`, `/implementer`, `/reviewer`) that run inline in your current session, never
+(`/planner`, `/implementer`, `/reviewer` — or just ask for one by name, e.g. "use the
+implementer"; none starts on its own) that run inline in your current session, never
 forked into a delegated subagent. Planner and Implementer need this because Claude Code
 strips the `AskUserQuestion` tool from every delegated subagent, foreground or
 background, and both need to ask clarifying questions. Reviewer never needs to ask

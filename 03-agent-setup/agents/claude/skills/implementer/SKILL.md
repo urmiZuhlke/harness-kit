@@ -1,7 +1,6 @@
 ---
 name: implementer
-description: 'Implements a feature end-to-end — from a GitHub issue number, or from a plain description when no issue exists. Challenges an ad hoc request first, then follows the same disciplined pipeline either way: branch, implement in scope, write tests, update docs, self-review, run CI, open a PR. Use for implementing an issue, building a feature, or a quick fix / ad hoc request with no ticket.'
-disable-model-invocation: true
+description: 'Implements a feature end-to-end — from a GitHub issue number, or from a plain description when no issue exists. Challenges an ad hoc request first, then follows the same disciplined pipeline either way: branch, implement in scope, write tests, update docs, self-review, run CI, open a PR. Use for implementing an issue, building a feature, or a quick fix / ad hoc request with no ticket. Invoke it when the user asks for the implementer by name in any wording — "/implementer", "use implementer", "switch to implementer", "let the implementer fix it" — and never on your own initiative.'
 argument-hint: '[issue number, or a description of what you want built]'
 model: sonnet
 ---

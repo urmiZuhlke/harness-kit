@@ -19,3 +19,12 @@ yarn-error.log*
 
 # Scorer output
 .vibecheck/
+
+# Camp evaluation working folders (bin/camp/): cloned team repos and the evaluation itself
+/repos/
+/eval/
+/repos.txt
+
+# Claude Code: personal overrides and session worktrees
+.claude/settings.local.json
+.claude/worktrees/

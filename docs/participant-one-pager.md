@@ -166,8 +166,8 @@ score how you worked:
 **One more thing leaves the facilitators' machine.** Three of the 100 points' worth of
 criteria — is your harness substantive, did your prompts show real decomposition, do your
 context documents record the real problem — cannot be settled by counting, so a
-facilitator judges them with an AI model. That is the only step where anything about you reaches a model, and it sends
-a **separate, trimmed file**, not your evidence:
+facilitator judges them with an AI model. Under the kit's own rubric, that is the only step where anything about you
+reaches a model, and it sends a **separate, trimmed file**, not your evidence:
 
 - **Sent:** your harness and context file excerpts (credentials already redacted), your
   prompt excerpts, your team name, your repository's *name*, and three counts — how many
@@ -180,6 +180,33 @@ The facilitator's own command writes that file, so it is what they judge from. I
 JSON and you can ask to see yours. Everything else about scoring is a local script and
 stays local. If even the trimmed file matters to you, tell a facilitator and they'll score
 those three criteria by hand instead — that option is yours, not a favour.
+
+### When your event scores with an AI judge (deck + repository + history)
+
+Some events score with the camp evaluator instead: an AI model (Claude, by Anthropic)
+reads your submission against the event's published rubric, and facilitators review the
+top five by hand. If your event says it does this, **your proposal deck, your SDLC
+diagram image, your repository and your history files are read by an AI model**:
+
+- **Read by the model:** your proposal PDF (every slide, including its images and
+  diagrams) and your diagram image; any file in your pushed repository it chooses to open — code, tests, README,
+  `AGENTS.md`, docs — **so anything you committed may be read**; and a facts file the
+  facilitators' script builds from your repository and history files: counts, timings, the
+  prompt and correction excerpts already in your history files (keys redacted), your
+  commit messages and their dates, file names, and the file and line of anything
+  credential-shaped — never the value.
+- **Not given to the model by that script:** the names on your commits, your branch
+  names, the names in your history files (members are numbered instead), and the
+  scanner's notes about text addressed to an evaluator, which go to facilitators only and
+  affect no score.
+- **Nothing is run.** Neither the model nor the facilitators execute your application or
+  your tests; your code is judged by reading it.
+- **Where it runs:** on a facilitator's machine, through their Claude Code account; the
+  scorecards and results stay with the facilitators.
+
+Do not commit anything you would not want read — real personal data, credentials, or
+files unrelated to the challenge. If this is a problem for you, tell a facilitator before
+the deadline.
 
 ## A warning, in good faith
 

@@ -24,7 +24,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CHAT_SOURCES, mergeEvidence } from '../lib/harvest/merge.mjs';
+import { CHAT_SOURCES, loadCommittedHistories, mergeEvidence } from '../lib/harvest/merge.mjs';
 import { harvest, slug } from '../lib/harvest/index.mjs';
 import { HISTORY_DIR, HISTORY_PREFIX } from '../lib/harvest/history.mjs';
 import { judgingBundle } from '../lib/score/judging-bundle.mjs';
@@ -234,18 +234,9 @@ async function collectRepos(parent, members, facilitatorFiles) {
     }
     members.push({ key, label: 'repository', evidence, repoOnly: true });
 
-    const historyDir = join(full, HISTORY_DIR);
-    let files = [];
-    try { files = readdirSync(historyDir); } catch { /* no .vibecheck — no histories */ }
-    for (const file of files.sort()) {
-      if (!file.startsWith(HISTORY_PREFIX) || !file.endsWith('.json')) continue;
-      const history = loadJson(join(historyDir, file));
-      if (history?.kind !== 'history' || !history.chat) {
-        skipped.push({ path: join(historyDir, file), why: 'not a history file' });
-        continue;
-      }
-      members.push({ key, label: history.member ?? basename(file, '.json'), evidence: history });
-    }
+    const { histories, skipped: unreadable } = loadCommittedHistories(full);
+    skipped.push(...unreadable);
+    for (const h of histories) members.push({ key, label: h.label, evidence: h.evidence });
   }
 }
 

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/repos/**)",
+      "Read(/eval/**)",
+      "Edit(/eval/**)",
+      "Bash(node bin/camp/pull.mjs *)",
+      "Bash(node bin/camp/prepare.mjs *)",
+      "Bash(node bin/camp/report.mjs *)",
+      "Bash(date +%s)"
+    ]
+  }
+}

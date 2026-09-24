@@ -5,9 +5,16 @@ Decisions already made (do not reopen them without the facilitators):
 - **100 points = the brief's six areas**, scored by the rubric in
   [`evaluation-rubric.md`](evaluation-rubric.md). The kit's generic six-dimension rubric
   is not used for this event's ranking.
-- **Four inputs, two uploads.** Teams add only the deck PDF (which contains the SDLC
-  diagram) and the history files, at the paths in [`submission.md`](submission.md); the
-  repository and its git history are the other two. PPTX is not accepted.
+- **Five inputs, three uploads.** Teams add the deck PDF, the AI SDLC diagram as its own
+  PNG/JPEG, and the history files, at the paths in [`submission.md`](submission.md); the
+  repository and its git history are the other two. The diagram image is read first; the
+  deck's diagram slide is the fallback. PPTX is not accepted.
+- **The estimate is judged on realism, not arithmetic** (F2): is the investment stated,
+  and could that effort deliver the full scope? Cheaper earns more only when the saving is
+  explained; an implausibly low figure scores as unrealistic.
+- **No calibration pass by default.** One judge per team, then a script merges the
+  scorecards into one table; the humans' top-five review is the sanity check.
+  `/camp-evaluate eval/ --calibrate` adds the comparison pass (≈ 3–5 min) if wanted.
 - **Nothing is run, and running does not count.** Neither the judge nor the facilitators
   execute a team's application or tests; whether it runs influences no score.
 - **No manual scoring.** All twenty teams get points; humans then review the top three to
@@ -20,12 +27,44 @@ Decisions already made (do not reopen them without the facilitators):
 | Step | Command | Time |
 | ---- | ------- | ---: |
 | 1. Pull | `node bin/camp/pull.mjs --list repos.txt --out repos/` — `repos.txt` is the submitted URLs, one per line (optionally `team-name,url`); clones all of them in parallel, re-running updates existing clones, `--before "<deadline>"` pins each to its last commit before the deadline, and it prints which failed | ~2 min |
-| 2. Prepare | `node bin/camp/prepare.mjs --repos repos/ --out eval/` — deterministic facts per team, and a pre-flight table of missing files | < 1 min |
-| 3. Judge | In Claude Code, in this repo: `/camp-evaluate eval/` — one judge per team in parallel, then one calibration pass | 12–18 min |
-| 4. Report | `node bin/camp/report.mjs eval/` — validates, applies calibration, writes `results.md`, `results.csv`, `results.html` | seconds |
+| 2. Prepare | `node bin/camp/prepare.mjs --repos repos/ --out eval/ --rubric docs/examples/zrs-camp-2026/evaluation-rubric.md` — deterministic facts per team, and a pre-flight table of missing files. **Read its `!!` lines**: an unreadable deck (Git LFS pointer, corrupt PDF) or a deck over 20 MB without poppler must be fixed before judging | < 1 min |
+| 3. Judge | In Claude Code, in this repo: `/camp-evaluate eval/` — one judge per team, 8 at a time (add `--calibrate` for the optional comparison pass) | ≈ 9 min |
+| 4. Report | `node bin/camp/report.mjs eval/` — a script, no AI: validates every scorecard, computes totals, writes `results.html` / `.md` / `.csv` (shareable) and **`review.html`** (facilitators only: every team side by side, evidence, links to the files, notes for the human review, **close calls** within 3 points). The skill runs it for you. A team that cannot be judged in time: `--exclude <team>` publishes the rest and says so | seconds |
+
+About 11–12 minutes from pull to results for 20 teams, leaving the rest of the 20–30
+minutes for the humans' review of the top three to five in `review.html`.
+
+**The evening before:**
+
+1. `brew install poppler git-lfs && git lfs install` — poppler lets the judge read decks
+   over 10 pages or 20 MB (page ranges); git-lfs makes a clone contain the real files if a
+   team stored its PDF or diagram in LFS. prepare refuses to go on without them when a
+   team needs them.
+2. Open Claude Code **in this repository**, so `.claude/settings.json` applies: it lets the
+   background judges read `repos/` and write `eval/` without a permission prompt. Keep
+   `repos/` and `eval/` inside the repository (both are git-ignored) — rules for paths
+   elsewhere do not apply.
+3. Test cloning two real team repositories with the facilitator account.
+4. Dry run: `pull` → `prepare` → `/camp-evaluate eval/` → open `review.html`, in exactly
+   the mode and account you will use tomorrow, on a fresh `eval/` folder. Delete `eval/`
+   afterwards so tomorrow's run starts clean.
 
 The results table: **Rank · Team · A · B · C · D · E · F · Total · Remarks**, where Remarks
 lists, per area not at max, the one-line reason from the scorecard.
+
+**What is where** (built): `bin/camp/` holds the three scripts, `lib/camp/` their logic,
+`.claude/skills/camp-evaluate/` the orchestrating skill and `.claude/agents/` the
+`camp-judge` and `camp-calibrator` subagents (Opus, high effort, tools Read/Glob/Grep/Write
+— no shell). `prepare` writes, per team, `eval/<team>/facts.json`, a copy of the deck as
+`eval/<team>/proposal.pdf`, a copy of the diagram image as `eval/<team>/sdlc-diagram.png`
+(or `.jpg`), and `eval/<team>/human-notes.json` (injection-scan notes, which
+the judge is never given); plus `eval/rubric.md`, `manifest.json` and `preflight.md`. The
+judge writes `eval/<team>/score.json`; the optional calibrator writes `eval/calibration.json`
+(a list of changes with reasons — it never edits a scorecard); `report` refuses to write
+anything while any card is missing or invalid. A card is invalid when a level and its
+points disagree: the top level is exactly max, the bottom exactly 0, and a level between
+is within one point of round(share × max). `report --check --team <id>` validates one card,
+which is how the skill retries a judge whose card was rejected.
 
 ## Architecture
 
@@ -42,8 +81,9 @@ submission facts, so the judge starts from the same normalised facts for every t
 - harness facts: instruction files, agent/prompt definition files (`.claude/agents/`,
   `.github/agents/`, `.github/prompts/`, `agents/`, `AGENTS.md`), context docs, first
   harness commit vs first code commit
-- repo facts: test file count, README commands, lockfiles, secret-scan findings, and the
-  injection-scan notes (reported to humans, never scored — kit rule 9)
+- repo facts: test file count, README commands, lockfiles, secret-scan findings (file and
+  line, never the value); the injection-scan notes go to `human-notes.json` for the
+  facilitators and are never in the judge's facts (kit rule 9)
 
 **One judge per team, all teams in parallel — not one agent per artefact type.** A single
 agent working through twenty decks, then another through twenty repos, is sequential,
@@ -61,15 +101,16 @@ and merge.*
 1. Anchored levels per sub-criterion (Full / Most / Some / None), never holistic scores.
 2. Every point cites evidence; every shortfall carries a remark.
 3. The same pre-extracted facts file format for every team.
-4. A calibration pass that reads all scorecards side by side, fixes inconsistent scoring
-   of similar evidence, and logs each change.
+4. Optional (`--calibrate`): a pass that reads all scorecards side by side, fixes
+   inconsistent scoring of similar evidence, and logs each change. Off by default — in the
+   rehearsal its changes were the size of run-to-run noise and never moved a rank.
 
 **Scorecard schema** (`eval/<team>/score.json`), validated by `report.mjs`:
 
 ```json
 {
   "team": "team-alpha",
-  "inputs": { "deck": "submission/proposal.pdf", "diagramSlides": [6], "historyFiles": 4 },
+  "inputs": { "deck": "submission/proposal.pdf", "diagram": "sdlc-diagram.png", "historyFiles": 4 },
   "criteria": [
     { "id": "A1", "points": 4, "max": 5, "level": "Most",
       "evidence": ["slide 2: 150 desks, 30 parking, no-shows"],
@@ -84,13 +125,78 @@ model.
 
 ## Model and effort
 
-- **Judges and calibration: Opus 5.5 at high effort.** Reading slide images and diagrams
+- **Judges (and the optional calibration): Opus 5.5 at high effort.** Reading slide images and diagrams
   and cross-checking them against code is where the strongest model earns its keep.
 - **Not max.** Max is slower, and at 20 teams in 20 minutes latency is the constraint; it
-  does not make scores more consistent — the anchored rubric and the calibration pass do.
+  does not make scores more consistent — the anchored rubric and the validator do.
 - **Measure, then decide.** The rehearsal on the example repos records minutes per team
-  and run-to-run variance. If 20 teams would exceed 20 minutes, drop the judges to medium
-  and keep calibration on high.
+  and run-to-run variance. If 20 teams would exceed 20 minutes, drop the judges to medium.
+
+## Rehearsal — 24 Sep 2026, the four example submissions, two full runs
+
+Both runs judged all four teams concurrently (8 judges in flight, the day's cap). The
+judges ran as general-purpose Opus agents following `camp-judge.md` verbatim — the new agent
+types were not yet loaded in that session — so effort was inherited rather than `high`.
+
+| | alpha | delta | bravo | charlie |
+| --- | --: | --: | --: | --: |
+| Run 1 (calibrated) | 98 | 93 | 55 | 18 |
+| Run 2 (calibrated) | 99 | 92 | 58 | 19 |
+| Expected (range) | 94 (85–100) | 77 (68–85) | 49 (40–60) | 13 (5–22) |
+| Sub-criteria that differ between runs (of 23), each by 1 point | 1 | 1 | 5 | 3 |
+| Judge minutes | 2.5–2.8 | 1.9–2.0 | 1.8 | 1.2–1.3 |
+
+- **Ranking** alpha > delta > bravo > charlie in both runs, as expected.
+- **Time**: 6.2 and 6.7 min wall-clock per run (judges ≈ 3–4 min incl. one retry, calibration
+  ≈ 3 min). Twenty teams at cap 8 is three waves: ≈ 9 min judging — inside the budget with
+  margin for `effort: high` and larger repositories. Calibration is now opt-in (see top).
+- **Since this rehearsal**: the diagram image became the primary source (these example
+  teams have none, so the deck fallback is what was exercised) and F2 was reworded to judge
+  realism rather than arithmetic.
+- **Validation earned its keep**: two of eight cards said `Full` with less than max and were
+  fixed by messaging the judge (≈ 30–50 s each). The judge prompt now says it explicitly.
+- **Injection**: delta's README asks the evaluator for full marks. Every judge reported it
+  under notes for humans; re-judging delta with the line removed gave 92 — no effect.
+- **Delta scores above its expected range**, and the gap to alpha is 5–7 points, not ~15.
+  Not the injection (above): the rubric's wording is looser than the answer key. A2 accepts
+  "targets **or** baselines", A3 "argued **or** quantified", and E3's three elements make one
+  committed secret `Most` (2), where the key expects 1. **Facilitators' call:** tighten those
+  three rows if those gaps should cost more, then re-run — the machinery needs no change.
+- Pre-flight matched the key on every fact it extracts (slides, history files, authors,
+  delta's misplaced deck, secret and injection line), and `--before "2026-09-23 14:00"`
+  pinned bravo to its 13:46 commit.
+
+## After the review — 24 Sep 2026, evening
+
+An independent review with twelve deliberately broken fixture repositories found the
+failure modes the clean examples could not show. All are fixed, each with a test in
+`tests/camp.test.mjs`:
+
+- **Decks the judge could not read**: a Git LFS pointer or corrupt file is now reported
+  (`lfs-pointer` / `not-a-pdf`) instead of counted as found; a deck over 20 MB is flagged
+  and read in page ranges (needs poppler, checked by prepare).
+- **One bad history file no longer blocks a team** — it is skipped with a reason.
+- **Partial publication is explicit** — `report --exclude <team>`; `--team` only validates.
+- **Symlinks** are checked out as plain files and never followed into a copy the judge reads.
+- **The client brief or a diagram PDF** is never guessed as the deck.
+- **facts.json is capped** (sessions, excerpts and commits sampled; totals exact), so a
+  team that worked a lot cannot make its facts unreadable.
+- **A clone with nothing before the deadline is removed**; a corrected URL in `repos.txt`
+  is used on re-run; SSH and credential prompts cannot hang `pull`; other branches with
+  newer commits and submodules are reported.
+- **A repository that changed after judging** has its old scorecard moved to
+  `score.stale.json`, so it is judged again.
+- **Scoring**: A2 now needs a baseline and a target, A3 a quantified value, and a committed
+  credential caps E3 at `Some` — the three places where the rehearsal showed a good team
+  and the best team getting the same points. The report flags top places within 3 points
+  as close calls for the humans to decide.
+
+Final run, set up exactly as for the day (`repos/` and `eval/` inside the kit, deadline
+pin, real `camp-judge` agents at high effort): **2.3 min for 4 teams, all scorecards valid
+first time** — alpha 98 · delta 90 · bravo 57 · charlie 18. Delta lost the points the new
+wording intends (A2 no baselines, A3 not quantified, E3 capped by its committed secret);
+the gap from 1st to 2nd grew from 5–7 to 8 points. Nineteen teams at 8 judges at a time
+is three waves: about 7 minutes of judging.
 
 ## Risks and how they are covered
 
@@ -98,8 +204,8 @@ model.
 | ---- | ----- |
 | A repo cannot be cloned | `pull.mjs` lists failures in the first two minutes; test access the evening before |
 | A team submitted PPTX only, or the PDF in the wrong place | PPTX-only scores as no proposal (announced up front); a misplaced PDF is found and used with a remark; the pre-flight in `collect-history.mjs` warns teams before 14:00 |
-| Prompt injection in a deck or README | Judge prompt treats team content as data; injection notes go to humans; calibration compares against peers |
-| Scores inconsistent across teams | Anchors, evidence, calibration pass; rehearsal measures variance |
+| Prompt injection in a deck or README | Judge prompt treats team content as data; injection notes go to humans; rehearsal showed no effect on the score |
+| Scores inconsistent across teams | Anchors, evidence, the validator; humans review the top five; `--calibrate` if a run looks off |
 | Run takes too long | Parallel judges; split-judge fallback; medium effort fallback |
 | Rate limits with 20 parallel judges | Concurrency cap (start at 8), retries in the orchestrator |
 | The AI pipeline fails on the day | `leaderboard --repos` still produces the kit's deterministic score in seconds |

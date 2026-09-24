@@ -1,7 +1,6 @@
 ---
 name: reviewer
-description: 'Pre-PR self-review. Run it on your working diff BEFORE opening a pull request. Reviews the whole change for security (OWASP Top 10), clean code, risk/likely bugs, acceptance-criteria coverage, and tests-with-behaviour, then reports findings the author must fix or explicitly justify. Read-only — never edits code, never opens the PR.'
-disable-model-invocation: true
+description: 'Pre-PR self-review. Run it on your working diff BEFORE opening a pull request. Reviews the whole change for security (OWASP Top 10), clean code, risk/likely bugs, acceptance-criteria coverage, and tests-with-behaviour, then reports findings the author must fix or explicitly justify. Read-only — never edits code, never opens the PR. Invoke it when the user asks for the reviewer by name in any wording — "/reviewer", "use reviewer", "run the reviewer" — and never on your own initiative.'
 argument-hint: '[the working diff, a branch, or a story/issue number]'
 ---
 
