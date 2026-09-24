@@ -24,22 +24,23 @@ is generated from the same file the scorer uses, so the two cannot drift apart.
 | 5 | Reproducibility & Handover | 10 | your repo |
 | 6 | It Actually Works | 15 | a facilitator, watching your demo |
 
-## If you are a team of more than one
+## Handing in — everyone on the team
 
-Your AI transcripts live in your own home directory, so a check run on one laptop measures
-one person and calls it the team. **Everyone runs the same command with the same team
-name:**
+Your AI transcripts live in your own home directory, so nobody can score how you worked
+unless you hand them in. **Every member runs one downloaded file in the project folder and
+pushes what it writes:**
 
 ```bash
-node bin/vibecheck.mjs --team "Your Team Name"
+node collect-history.mjs
 ```
 
-It writes one file each, and the team name inside links them. They are combined into one
-score when a facilitator collects them. Skip it and four fifths of your team's work is
-invisible to the score.
+It writes `.vibecheck/history-<your name>.json`; the participant one-pager has the download
+link and exactly what the file contains. Your repository is your team — every history file
+in it is combined into one score. Skip it and your share of the team's work is invisible to
+the score.
 
-**Transcripts can be read from Claude Code, GitHub Copilot in VS Code, Codex CLI and
-Cursor.** Using something else costs you nothing directly — those criteria are reported as
+**Transcripts can be read from Claude Code (CLI, VS Code or JetBrains extension, or the Code tab in Claude Desktop), Codex (CLI, desktop app or VS Code extension), GitHub Copilot in VS Code, and Cursor.** Browser chats
+(ChatGPT, claude.ai, Codex on the web) cannot. Using something else costs you nothing directly — those criteria are reported as
 unassessed rather than failed, and ranking uses your share of assessable points — but you
 also get no feedback on them, so run `/journal` at milestones instead.
 

@@ -71,29 +71,41 @@ facilitating, you are walking.
 
 ## The whole workflow, both sides
 
-**Each person, once, in a terminal.** It is a plain script — no AI, no agent:
+**Each person, once, in their project folder.** One downloaded file — no kit clone, no
+team name, no AI:
 
 ```bash
-node bin/vibecheck.mjs --team "Their Team Name"
+curl -fsSLo ~/collect-history.mjs https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs
+node ~/collect-history.mjs
 ```
 
-That writes one file to hand in and prints its path. Everyone on a team uses the same team
-name; that name is what links their laptops together.
+It writes `.vibecheck/history-<their name>.json` into the project and prints the git
+commands to commit and push it. The repository is the team; each person's file carries
+their own name, so teammates never conflict. (The participant one-pager has the Windows
+version.) If the download URL is blocked, hand the file out any other way — it is
+`dist/collect-history.mjs` in this repo, and it is the whole tool.
 
-**You, once.** Collect every file from every team into one flat folder and run:
+**You, once, after the deadline.** Clone every team's repository into one folder — the
+folder name becomes the team name — and run:
 
 ```bash
-node bin/leaderboard.mjs --dir collected --html leaderboard.html
+node bin/leaderboard.mjs --repos repos --html leaderboard.html
 ```
 
-Files are grouped by team name and members are merged automatically. Your own per-team
-files live in the same folder: `<team-slug>.scorecard.json` (demo, checklist, privacy,
-badges) and `<team-slug>.judgement.json` (written by `/facilitator-judge`).
+Each repository and its git history are read on your machine, each member's history file
+is merged in, and **no team code is run** — so it takes seconds for twenty teams and needs
+none of their toolchains. Your own chat history is never read into anyone's score. Your
+per-team files live in the same folder as the clones: `<team-slug>.scorecard.json` (demo,
+checklist, privacy, badges) and `<team-slug>.judgement.json` (written by
+`/facilitator-judge`).
 
-**Read the "Ppl" column.** It says how many people each team's score actually covers. A
-team of five showing 1 was scored on one laptop, and nothing else in the output looks
-wrong — the leaderboard names those teams explicitly underneath. Chase the missing files
-before you rank anyone.
+**Read the "Ppl" column.** It is how many history files each team committed. A team of
+five showing 1 is scored on one person's work, and a team showing 0 has its working method
+unassessed; the leaderboard names both underneath. Chase the missing files before you rank
+anyone.
+
+*The older hand-in flow still works: `vibecheck --team "Name"` on each laptop, every file
+into one flat folder, `leaderboard --dir collected`.*
 
 **Have every team run it once mid-way, not only at hand-in.** Discovering at 13:55 that
 one person's tool produced nothing is a problem; discovering it on day one is a five-minute
@@ -101,8 +113,10 @@ fix.
 
 ## When the authoritative snapshot is taken
 
-Everyone runs the command **at the hand-in deadline**, and those files rank everyone and
-decide which teams go through.
+Everyone runs `collect-history` and pushes **at the hand-in deadline**; you clone at the
+deadline, and those clones rank everyone and decide which teams go through. Clone at a
+fixed time, or pin each clone to the last commit before the deadline, so a late push cannot
+change a rank.
 
 Teams that continue improving after hand-in — where the event allows it — **run it again
 just before they present**, so the demo you score and the code you scored are the same
@@ -117,7 +131,7 @@ context documents record the actual problem — cannot be settled by counting, a
 judged by a model. Until judged they fall back to a rough heuristic, so **the kit works
 all day with no AI involved at all**; the score just stays marked **provisional**.
 
-Running the leaderboard writes `collected/judging/<team>.json` — a small file per team.
+Running the leaderboard writes `<folder>/judging/<team>.json` — a small file per team.
 Run `/facilitator-judge` on those, not on the evidence: they hold the harness, context and
 prompt excerpts and deliberately leave out the committer names, repository paths, branch
 names and test output, none of which change a judgement. The skill writes
@@ -146,8 +160,9 @@ choice; make it deliberately rather than discovering it at 14:00.
 
 ## Which tools the kit can read
 
-Claude Code, GitHub Copilot in VS Code, Codex CLI, and Cursor. Anything else reports as
-not-harvested, which **costs no points**: those criteria leave the denominator and ranking
+Claude Code (CLI, VS Code or JetBrains extension, or the Code tab in Claude Desktop), Codex
+(CLI, desktop app or VS Code extension), GitHub Copilot in VS Code, and Cursor — not
+browser chats. Anything else reports as not-harvested, which **costs no points**: those criteria leave the denominator and ranking
 uses share of assessable points. What it does cost is feedback, so point those teams at
 `/journal` early — it is their fallback evidence and it is capped below what a transcript
 earns, deliberately, because they write it about themselves.
@@ -201,8 +216,10 @@ area.
 
 ## A note on trust
 
-Scoring executes the team's own test command, discovered from their `package.json`,
-`Makefile`, `pom.xml` or language manifest. Run `vibecheck` **on the team's machine, with
-the team present** — never point it at a repo you don't know from your own laptop.
+`leaderboard --repos` never executes anything from a team's repository, so scoring twenty
+pushed repos on your own laptop is safe. The self-check is different: `vibecheck` executes
+the team's own test command, discovered from their `package.json`, `Makefile`, `pom.xml` or
+language manifest. Run `vibecheck` **on the team's machine, with the team present** — never
+point it at a repo you don't know from your own laptop.
 `node bin/vibecheck.mjs --no-run-tests` skips execution if you're unsure; the criterion
 then reports as unscored rather than failed, so nobody loses points for your caution.

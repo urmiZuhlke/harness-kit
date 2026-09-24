@@ -51,32 +51,46 @@ live, and yours to act on all day.
 **Run it early**, not just before hand-in. It costs you nothing and tells you exactly
 what's worth doing next while you still have time to do it.
 
-**At hand-in**, give your `.vibecheck/` folder to a facilitator. They recompute your score
-independently — editing your own `score.json` changes nothing.
+Practice mode needs a clone of the kit. **Handing in does not** — see the next section.
+Facilitators recompute every score themselves from your pushed repository, so editing your
+own `score.json` changes nothing.
 
-## If you're a team of more than one — read this bit
+## Handing in — every team member runs one file
 
-Your AI transcripts live in *your own* home directory, not in the repo. A check run on one
-laptop therefore scores one person's day and calls it the team — and nothing in the output
-looks wrong when that happens.
+Your AI chat history lives in *your own* home directory, not in the repo. Nobody can see
+how your team worked unless each of you hands it in, and a team where one person does is
+scored on one person's work.
 
-So **every member runs the same one command, with the same team name**:
+So before the deadline, **every member** does this once, on the laptop they worked on:
 
 ```bash
-node bin/vibecheck.mjs --team "Your Team Name"
+# macOS / Linux — save the file anywhere, then run it from your project folder
+curl -fsSLo ~/collect-history.mjs https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs
+cd ~/path/to/your-project
+node ~/collect-history.mjs
 ```
 
-That writes **one file** to hand in — the path is printed at the end, and the team name
-inside it is what links your laptops together. Spell the team name the same way each time;
-everything else is handled for you. Commit `.vibecheck/` so the file travels with your
-repository, and hand in the repository link.
+```powershell
+# Windows (PowerShell)
+iwr https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs -OutFile $HOME\collect-history.mjs
+cd C:\path\to\your-project
+node $HOME\collect-history.mjs
+```
 
-Do this once mid-way too, not only at the deadline: it is how you find out early that
-someone's tool can't be read, which is a five-minute problem on day one and an unfixable
-one at 14:00.
+It is one self-contained file, it needs Node 20 or newer and nothing else, and it takes a
+few seconds. It writes **`.vibecheck/history-<your name>.json`** into your project and
+prints the three git commands to commit and push it. Push it with your work; facilitators
+pull your repository and read it from there. There is no team name to type — your
+repository *is* your team — and each person's file has their own name, so teammates never
+conflict.
 
-**Transcripts can be read from:** Claude Code, GitHub Copilot in VS Code, Codex CLI, and
-Cursor. Using something else costs you nothing directly — those criteria come back
+Run it **from the folder you opened in your AI tool** — sessions are matched by folder. If
+it finds nothing, it says why. Run it once mid-way too, not only at the deadline: it is how
+you find out early that someone's tool can't be read, which is a five-minute problem on
+day one and an unfixable one at the deadline.
+
+**Transcripts can be read from:** Claude Code (CLI, VS Code or JetBrains extension, or the Code tab in Claude Desktop), Codex (CLI, desktop app or VS Code extension), GitHub Copilot in VS Code, and Cursor. Browser chats (ChatGPT, claude.ai,
+Codex on the web) cannot. Using something else costs you nothing directly — those criteria come back
 "unassessed" rather than failed, and ranking uses your share of assessable points — but
 you get no feedback on them either, so run `/journal` at milestones. It's your fallback,
 and it's a good habit regardless.
@@ -86,7 +100,38 @@ than silently finding nothing.)*
 
 ## Privacy — what's actually read, and where it goes
 
-`vibecheck` reads your AI chat transcripts **locally** to score how you worked:
+### The history file you hand in
+
+`collect-history.mjs` reads your AI chat history **locally** and writes one file,
+`.vibecheck/history-<your name>.json`. **You commit and push it, so it goes wherever your
+repository goes** — visible to your teammates, the facilitators, and anyone else who can
+see the repository. If your repository is public, so is this file. Open it and read it
+before you commit it.
+
+- **In it:** your name (from git `user.name`, or your computer's username); the name of
+  your project folder; and, for each chat session in this project, its ID, when it
+  started and ended, branch names, how many prompts you wrote and how long they were, which tools the
+  agent called and how often, how many commands it ran and of what kind (test, build,
+  destructive), whether each test run passed or failed, how many times you corrected it,
+  and whether you used a planning step.
+- **Also in it:** a few of your prompts, cut to 280 characters — at most 12 per session,
+  plus up to 12 where you corrected the agent — so a facilitator can see *how* you asked
+  for things. Anything that looks like a key, token or password is replaced by
+  `[redacted: …]` before it is written. Anything else you typed into those first 280
+  characters is in there as you typed it.
+- **Never in it:** full conversations, the agent's replies, your source code, the path to
+  your project on your laptop, or anything from sessions in other folders.
+- **Nothing is uploaded by the script.** The only way the file leaves your laptop is you
+  pushing it.
+
+On the facilitator's side, your pushed repository and its git history are read — including
+the names on your commits, which your repository already shows — and your code is **not
+run**. What they produce from it is described below.
+
+### The self-check (`vibecheck`)
+
+If you run the practice check, `vibecheck` reads your AI chat transcripts **locally** to
+score how you worked:
 
 - **Read:** message counts, prompt lengths, which tools got called, whether tests were
   run and whether they passed, commit timestamps.
@@ -100,7 +145,8 @@ than silently finding nothing.)*
   on this machine and your branch names; the names of the tools your agent called; and up
   to 4,000 characters of whatever your test command last printed, with credential-shaped
   strings replaced by `[redacted]`.
-- **Your team name and who ran the check**, from `--team` and your git `user.name`. On a
+- **Your team name and who ran the check**, from `--team` and your git `user.name`, if you
+  used the older hand-in file instead of the history file above. On a
   merged team bundle this becomes a per-member breakdown: who contributed, from which repo
   path on their own machine, when, and how many sessions and prompts each. That is the
   audit trail for a merged score, and it is visible to anyone who opens the file.
@@ -112,10 +158,12 @@ than silently finding nothing.)*
 
 `evidence.json` is yours — open it and read exactly what was collected about you.
 
-**One thing does leave your machine.** Three of the 100 points' worth of criteria — is your
-harness substantive, did your prompts show real decomposition, do your context documents
-record the real problem — cannot be settled by counting, so a facilitator judges them with
-an AI model. That is the only step where anything about you reaches a model, and it sends
+### The judging pass
+
+**One more thing leaves the facilitators' machine.** Three of the 100 points' worth of
+criteria — is your harness substantive, did your prompts show real decomposition, do your
+context documents record the real problem — cannot be settled by counting, so a
+facilitator judges them with an AI model. That is the only step where anything about you reaches a model, and it sends
 a **separate, trimmed file**, not your evidence:
 
 - **Sent:** your harness and context file excerpts (credentials already redacted), your

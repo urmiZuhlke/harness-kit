@@ -32,8 +32,11 @@ because a previous version of the kit assumed one team, one laptop, one day.
 npm test     # unit tests for the harvester, scorer and injection detection
 npm run check # tests + kit self-checks (what CI runs)
 node bin/vibecheck.mjs                     # score this repo against its own rubric
-node bin/vibecheck.mjs --team "Name"        # ...and write one file to hand in
-node bin/leaderboard.mjs --dir <collected>  # group by team, merge members, rank
+node bin/collect-history.mjs                # participant hand-in: write .vibecheck/history-<me>.json
+npm run build:collector                     # rebuild dist/collect-history.mjs (the file participants download)
+node bin/leaderboard.mjs --repos <clones>   # facilitator: one cloned repo per team, rank
+node bin/vibecheck.mjs --team "Name"        # older hand-in: write one file to hand in
+node bin/leaderboard.mjs --dir <collected>  # older hand-in: group by team, merge members, rank
 node bin/vibecheck.mjs --evidence <file>    # score one existing bundle
 node bin/merge-evidence.mjs --dir <dir> --out <file>   # merge by hand, rarely needed
 ```
@@ -134,6 +137,10 @@ doing so — that path is what stops "your Node is old" turning into "this team 
   transcripts has caught defects the unit tests did not.
 - Touched `plugin/scripts/install.mjs` or a bundled skill: run
   `node plugin/scripts/install.mjs --dry-run` and confirm the expected result, no errors.
+- Touched anything `bin/collect-history.mjs` imports (the chat adapters, `shared.mjs`,
+  `redact.mjs`, `history.mjs`): run `npm run build:collector` and commit
+  `dist/collect-history.mjs`. It is the single file participants download, and
+  `tests/collector.test.mjs` fails while it is stale.
 - Touched a `SKILL.md`: confirm the YAML frontmatter still has `name` and `description`
   and parses. CI checks this too — see
   [`.github/workflows/kit-check.yml`](.github/workflows/kit-check.yml).

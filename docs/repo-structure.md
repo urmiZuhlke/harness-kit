@@ -7,12 +7,17 @@ Reference for anyone changing the kit. To just use it, read the
 harness-kit/
 ├── README.md                          ← what this is, for teams and for facilitators
 ├── bin/
-│   ├── vibecheck.mjs                  ← what a participant runs: --team writes one file
-│   ├── leaderboard.mjs                ← what a facilitator runs: group, merge, rank
+│   ├── collect-history.mjs            ← participant hand-in: writes .vibecheck/history-<me>.json
+│   ├── vibecheck.mjs                  ← self-check; --team writes the older hand-in file
+│   ├── leaderboard.mjs                ← what a facilitator runs: --repos <clones>, rank
 │   └── merge-evidence.mjs             ← merge by hand; the leaderboard does it for you
+├── dist/
+│   └── collect-history.mjs            ← GENERATED single file participants download
 ├── lib/
 │   ├── harvest/                       ← repo, git, journal + one adapter per AI tool
 │   │   ├── adapters/                  ← claude-code · copilot · codex · cursor
+│   │   ├── history.mjs                ← one person's chat history — all the collector reads
+│   │   ├── redact.mjs                 ← credential patterns; masks every excerpt
 │   │   └── merge.mjs                  ← union sessions, re-derive every total
 │   ├── score/                         ← dimensions.mjs is the rubric as code
 │   │   └── judging-bundle.mjs         ← the only thing that reaches a model

@@ -15,7 +15,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { harvestCodex } from '../lib/harvest/adapters/codex.mjs';
+import { harvestClaudeCode } from '../lib/harvest/adapters/claude-code.mjs';
+import { harvestCodex, sessionFiles } from '../lib/harvest/adapters/codex.mjs';
 import { isPlanningTool } from '../lib/harvest/adapters/copilot.mjs';
 import { commandFrom, harvestCursor } from '../lib/harvest/adapters/cursor.mjs';
 import { editorStorageRoots, makeIsInRepo, workspaceFolderOf } from '../lib/harvest/shared.mjs';
@@ -43,9 +44,14 @@ function codexHome(lines, { dated = true } = {}) {
  * first on Windows, so a test that redirected only HOME quietly read the developer's own
  * Cursor history and passed for the wrong reason.
  */
-async function withHome(home, fn) {
-  const keys = ['HOME', 'USERPROFILE', 'APPDATA', 'XDG_CONFIG_HOME'];
+async function withHome(home, fn, extraEnv = {}) {
+  // CODEX_HOME and CLAUDE_CONFIG_DIR relocate a tool's whole history, so a developer who has
+  // either set would otherwise have these tests read their real sessions.
+  const keys = ['HOME', 'USERPROFILE', 'APPDATA', 'XDG_CONFIG_HOME', 'CODEX_HOME', 'CLAUDE_CONFIG_DIR'];
   const previous = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  delete process.env.CODEX_HOME;
+  delete process.env.CLAUDE_CONFIG_DIR;
+  Object.assign(process.env, extraEnv);
   process.env.HOME = home;
   process.env.USERPROFILE = home;
   process.env.APPDATA = join(home, 'AppData', 'Roaming');
@@ -113,6 +119,81 @@ test('a Codex record with the fields at the top level reads the same as a wrappe
     assert.equal(s.sessionId, 'flat-1');
     assert.equal(s.userPrompts, 1);
   });
+});
+
+// --- where Codex keeps sessions: the CLI, the desktop app and the IDE extension ------------
+
+const codexLines = (text) => [
+  { type: 'session_meta', payload: { cwd: REPO } },
+  { type: 'response_item', payload: { type: 'message', role: 'user', content: text } },
+];
+
+function writeRollout(dir, name, lines) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, name), lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf8');
+}
+
+test('Codex sessions under $CODEX_HOME are read', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-codex-'));
+  const relocated = join(home, 'elsewhere', 'codex');
+  writeRollout(join(relocated, 'sessions', '2026', '09', '24'), 'rollout-a.jsonl', codexLines('plan the booking flow'));
+  await withHome(home, async () => {
+    const r = await harvestCodex({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.source.status, 'harvested');
+    assert.equal(r.sessions.length, 1);
+  }, { CODEX_HOME: relocated });
+});
+
+test('archived Codex sessions still count', async () => {
+  // Archiving in the app or extension moves the rollout to archived_sessions/; it tidies
+  // the sidebar, it does not mean the work did not happen.
+  const home = mkdtempSync(join(tmpdir(), 'hk-codex-'));
+  writeRollout(join(home, '.codex', 'sessions', '2026', '09', '24'), 'rollout-live.jsonl', codexLines('live one'));
+  writeRollout(join(home, '.codex', 'archived_sessions'), 'rollout-old.jsonl', codexLines('archived one'));
+  await withHome(home, async () => {
+    const r = await harvestCodex({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.sessions.length, 2);
+  });
+});
+
+test('a Codex rollout caught in both places mid-archive is counted once', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-codex-'));
+  const lines = codexLines('the same session');
+  writeRollout(join(home, '.codex', 'sessions', '2026', '09', '24'), 'rollout-same.jsonl', lines);
+  writeRollout(join(home, '.codex', 'archived_sessions'), 'rollout-same.jsonl', lines);
+  await withHome(home, async () => {
+    const r = await harvestCodex({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.sessions.length, 1);
+    assert.equal(r.sessions[0].userPrompts, 1);
+  });
+});
+
+test('two Codex rollouts sharing a session id are both counted', async () => {
+  // A forked or resumed session can carry its parent's id. Collapsing on id would drop real
+  // work, so only the same *file* is ever deduplicated.
+  const home = mkdtempSync(join(tmpdir(), 'hk-codex-'));
+  const withId = (text) => [
+    { type: 'session_meta', payload: { id: 'shared-id', cwd: REPO } },
+    { type: 'response_item', payload: { type: 'message', role: 'user', content: text } },
+  ];
+  const dir = join(home, '.codex', 'sessions', '2026', '09', '24');
+  writeRollout(dir, 'rollout-1.jsonl', withId('first'));
+  writeRollout(dir, 'rollout-2.jsonl', withId('second'));
+  await withHome(home, async () => {
+    const r = await harvestCodex({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.sessions.length, 2);
+  });
+});
+
+test('when the Codex file cap bites, the newest sessions are the ones kept', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hk-codex-cap-'));
+  try {
+    for (const [y, m, d] of [['2025', '01', '05'], ['2026', '09', '23'], ['2026', '09', '24'], ['2026', '02', '11']]) {
+      writeRollout(join(root, y, m, d), 'rollout-' + y + '-' + m + '-' + d + '.jsonl', codexLines('x'));
+    }
+    const kept = sessionFiles(root, 2).map((f) => f.split(/[\\/]/).pop());
+    assert.deepEqual(kept, ['rollout-2026-09-24.jsonl', 'rollout-2026-09-23.jsonl']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('a Codex session in another repo is not counted', async () => {
@@ -374,4 +455,62 @@ test('Copilot planning tools are recognised, and ordinary tools are not', () => 
     '', null, undefined]) {
     assert.equal(isPlanningTool(tool), false, JSON.stringify(tool) + ' is not a planning tool');
   }
+});
+
+// --- where Claude Code keeps sessions: the CLI, the IDE extensions and Claude Desktop ----------
+
+const claudeLine = (sessionId, text, extra = {}) => JSON.stringify({
+  type: 'user', sessionId, timestamp: '2026-09-24T09:00:00Z', cwd: REPO, gitBranch: 'main',
+  message: { role: 'user', content: [{ type: 'text', text }] }, ...extra,
+});
+
+function writeClaudeSession(projectsDir, file, lines) {
+  const dir = join(projectsDir, 'proj');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, file), lines.join('\n') + '\n', 'utf8');
+}
+
+test('Claude Code sessions under $CLAUDE_CONFIG_DIR are read, and ~/.claude still is', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-claude-'));
+  const relocated = join(home, 'custom-claude');
+  writeClaudeSession(join(relocated, 'projects'), 'a.jsonl', [claudeLine('a', 'from the relocated dir')]);
+  writeClaudeSession(join(home, '.claude', 'projects'), 'b.jsonl', [claudeLine('b', 'from the default dir')]);
+  await withHome(home, async () => {
+    const r = await harvestClaudeCode({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.source.status, 'harvested');
+    assert.deepEqual(r.sessions.map((x) => x.sessionId).sort(), ['a', 'b']);
+  }, { CLAUDE_CONFIG_DIR: relocated });
+});
+
+test('the same Claude Code file under both config dirs is counted once', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-claude-'));
+  const relocated = join(home, 'custom-claude');
+  const lines = [claudeLine('same', 'one prompt')];
+  writeClaudeSession(join(relocated, 'projects'), 'same.jsonl', lines);
+  writeClaudeSession(join(home, '.claude', 'projects'), 'same.jsonl', lines);
+  await withHome(home, async () => {
+    const r = await harvestClaudeCode({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.sessions.length, 1);
+  }, { CLAUDE_CONFIG_DIR: relocated });
+});
+
+test('a subagent transcript sharing its parent\u2019s session id is still read', async () => {
+  // Newer Claude Code writes subagent work to its own file under the parent's session id.
+  // Its tool calls and test runs are real work; deduplicating by id would delete them.
+  const home = mkdtempSync(join(tmpdir(), 'hk-claude-'));
+  const projects = join(home, '.claude', 'projects');
+  writeClaudeSession(projects, 'parent.jsonl', [claudeLine('parent-id', 'build the booking api')]);
+  writeClaudeSession(projects, 'agent-1.jsonl', [
+    claudeLine('parent-id', 'subagent brief', { isSidechain: true }),
+    JSON.stringify({
+      type: 'assistant', sessionId: 'parent-id', cwd: REPO, isSidechain: true,
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'npm test' } }] },
+    }),
+  ]);
+  await withHome(home, async () => {
+    const r = await harvestClaudeCode({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.sessions.length, 2);
+    assert.equal(r.sessions.reduce((n, x) => n + x.toolCallTotal, 0), 1, 'the subagent\u2019s tool call was lost');
+    assert.equal(r.sessions.reduce((n, x) => n + x.userPrompts, 0), 1, 'a sidechain brief is not a human prompt');
+  });
 });

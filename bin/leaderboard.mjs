@@ -7,8 +7,14 @@
  * hand-edits their own score changes nothing. Every team is scored by this one build of
  * the scorer, which is what makes the ranking defensible.
  *
+ *   node bin/leaderboard.mjs --repos repos         # one cloned repository per team
  *   node bin/leaderboard.mjs --dir collected       # every file, one flat folder
  *   node bin/leaderboard.mjs bundles/*             # or one directory per team
+ *
+ * `--repos` is the pushed-repository flow: each team member ran collect-history, which
+ * committed `.vibecheck/history-<name>.json`; the facilitator clones every team's repo into
+ * one folder and points this at it. The repository and its git history are read here, with
+ * none of the team's code executed and none of this machine's own chat history read.
  *
  * The flat folder is the normal way. Each person hands in one file from
  * `vibecheck --team "<name>"`; drop all of them into one folder and point `--dir` at it.
@@ -18,8 +24,9 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mergeEvidence } from '../lib/harvest/merge.mjs';
-import { slug } from '../lib/harvest/index.mjs';
+import { CHAT_SOURCES, mergeEvidence } from '../lib/harvest/merge.mjs';
+import { harvest, slug } from '../lib/harvest/index.mjs';
+import { HISTORY_DIR, HISTORY_PREFIX } from '../lib/harvest/history.mjs';
 import { judgingBundle } from '../lib/score/judging-bundle.mjs';
 import { score, SCORER_VERSION } from '../lib/score/index.mjs';
 import { renderLeaderboard } from '../lib/report/render.mjs';
@@ -27,10 +34,13 @@ import { renderLeaderboard } from '../lib/report/render.mjs';
 const KIT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
-  const args = { bundles: [], dir: null, out: null, html: null, help: false, judgingFiles: true };
+  const args = {
+    bundles: [], dir: null, repos: null, out: null, html: null, help: false, judgingFiles: true,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--dir') args.dir = argv[++i];
+    else if (arg === '--repos') args.repos = argv[++i];
     else if (arg === '--out') args.out = argv[++i];
     else if (arg === '--html') args.html = argv[++i];
     else if (arg === '--no-judging-files') args.judgingFiles = false;
@@ -41,13 +51,28 @@ function parseArgs(argv) {
 }
 
 function help() {
-  console.log(`Usage: node bin/leaderboard.mjs --dir <folder> [--out <file.json>] [--html <file>]
+  console.log(`Usage: node bin/leaderboard.mjs --repos <folder> [--out <file.json>] [--html <file>]
+       node bin/leaderboard.mjs --dir <folder>   [--out <file.json>] [--html <file>]
 
 Recomputes every team's score from their evidence and ranks them. Any score.json handed in
 is ignored — the evidence is the source of truth, so editing your own score achieves
 nothing.
 
-Collect every file everyone handed in into one flat folder and point --dir at it:
+Pushed repositories (the usual flow). Clone every team's repository into one folder; the
+folder name is the team name on the leaderboard:
+
+  repos/
+    team-blue/                   a clone, with .vibecheck/history-*.json committed in it
+    team-red/
+    team-blue.scorecard.json     you write these: demo score, checklist, badges
+    team-blue.judgement.json     written by /facilitator-judge
+
+Each repository and its git history are read on this machine; each member's chat history
+comes from their committed history file. None of the teams' code is run, and nothing from
+this machine's own AI chat history is read.
+
+Hand-in files. Collect every file everyone handed in into one flat folder and point --dir
+at it:
 
   collected/
     team-blue--ana.json          one per person, from vibecheck --team "Team Blue"
@@ -65,6 +90,7 @@ they leave out the committer names, repository paths, branch names and test outp
 a judgement does not depend on. Pass --no-judging-files to skip writing them.
 
 Options:
+  --repos <folder> A folder of cloned team repositories, one per team
   --dir <folder>   A flat folder of handed-in files, or a parent of bundle directories
   --no-judging-files  Do not write the trimmed per-team files for /facilitator-judge
   --out <file>     Also write the ranked results as JSON
@@ -165,7 +191,66 @@ function memberLabelOf(evidence, path) {
   return evidence?.team?.member ?? basename(path, '.json');
 }
 
+/** Folders in a --repos folder that are never a team: what this command itself writes. */
+const NOT_A_TEAM = new Set(['judging']);
+
+/**
+ * One cloned repository per team, each read here plus every history file committed in it.
+ *
+ * The repository is harvested with `chat: false` and `runTestSuite: false`. The first
+ * keeps the facilitator's own transcripts out of every team's evidence; the second is
+ * because running twenty teams' test suites means running twenty strangers' code on this
+ * laptop, in toolchains it may not have, inside the hour there is to score them.
+ */
+async function collectRepos(parent, members, facilitatorFiles) {
+  let entries;
+  try { entries = readdirSync(parent); } catch (err) {
+    console.error('Could not read --repos ' + parent + ': ' + err.message);
+    process.exit(1);
+  }
+  for (const name of entries.sort()) {
+    if (name.startsWith('.')) continue;
+    const full = join(parent, name);
+    let isDir = false;
+    try { isDir = statSync(full).isDirectory(); } catch { continue; }
+    if (!isDir) {
+      const facilitatorMatch = name.match(FACILITATOR_FILE);
+      if (facilitatorMatch) {
+        const parsed = loadJson(full);
+        if (!parsed) { skipped.push({ path: full, why: 'unreadable' }); continue; }
+        facilitatorFiles[facilitatorMatch[2].toLowerCase()].set(slug(facilitatorMatch[1]), parsed);
+      }
+      continue;
+    }
+    if (NOT_A_TEAM.has(name)) continue;
+
+    const key = slug(name) || 'unnamed';
+    let evidence;
+    try {
+      evidence = await harvest(full, { chat: false, runTestSuite: false, kitRoot: KIT_ROOT, team: name });
+    } catch (err) {
+      skipped.push({ path: full, why: 'could not read the repository: ' + err.message });
+      continue;
+    }
+    members.push({ key, label: 'repository', evidence, repoOnly: true });
+
+    const historyDir = join(full, HISTORY_DIR);
+    let files = [];
+    try { files = readdirSync(historyDir); } catch { /* no .vibecheck — no histories */ }
+    for (const file of files.sort()) {
+      if (!file.startsWith(HISTORY_PREFIX) || !file.endsWith('.json')) continue;
+      const history = loadJson(join(historyDir, file));
+      if (history?.kind !== 'history' || !history.chat) {
+        skipped.push({ path: join(historyDir, file), why: 'not a history file' });
+        continue;
+      }
+      members.push({ key, label: history.member ?? basename(file, '.json'), evidence: history });
+    }
+  }
+}
+
 const { members, facilitatorFiles } = collect(args.bundles.map((b) => resolve(b)), args.dir);
+if (args.repos) await collectRepos(resolve(args.repos), members, facilitatorFiles);
 if (!members.length) {
   for (const s of skipped) console.error('Skipped ' + s.path + '  (' + s.why + ')');
   console.error('\nNothing to rank — no readable evidence was found.');
@@ -185,14 +270,27 @@ const rows = [];
 for (const [key, group] of byTeam) {
   let evidence = group[0].evidence;
   let mergeWarnings = [];
-  if (group.length > 1) {
+  // A cloned repository always goes through the merge, even alone: that is where its
+  // members' history files join it, and where "nobody committed one" gets said.
+  if (group.length > 1 || group.some((m) => m.repoOnly)) {
     try {
-      const merged = mergeEvidence(group.map((m) => ({ label: m.label, evidence: m.evidence })));
+      const merged = mergeEvidence(group.map((m) => ({
+        label: m.label, evidence: m.evidence, repoOnly: m.repoOnly,
+      })));
       evidence = merged.evidence;
       mergeWarnings = merged.warnings;
     } catch (err) {
       skipped.push({ path: key, why: 'could not merge ' + group.length + ' file(s): ' + err.message });
       continue;
+    }
+  }
+  const people = group.filter((m) => !m.repoOnly).length;
+  if (group.some((m) => m.repoOnly) && !people) {
+    for (const tool of CHAT_SOURCES) {
+      evidence.sources[tool] = {
+        status: 'not-harvested',
+        reason: 'no ' + HISTORY_DIR + '/' + HISTORY_PREFIX + '*.json committed to this repository',
+      };
     }
   }
   const scorecard = facilitatorFiles.scorecard.get(key) ?? null;
@@ -208,7 +306,8 @@ for (const [key, group] of byTeam) {
   rows.push({
     team: evidence?.team?.name ?? scorecard?.team ?? evidence?.repo?.name ?? key,
     bundle: key,
-    members: group.length,
+    members: people,
+    fromRepo: group.some((m) => m.repoOnly),
     mergeWarnings,
     evidence,
     result,
@@ -340,6 +439,14 @@ if (withNotes.length) {
 // How many people each team's score actually covers. A team of five that hands in one
 // file is scored on one person's day, and nothing else in the output looks wrong — so it
 // is named here rather than left for someone to notice.
+const noHistory = clean.filter((r) => r.fromRepo && r.members === 0);
+if (noHistory.length) {
+  console.log('\n  No history file committed for ' + noHistory.length + ' team(s): '
+    + noHistory.map((r) => r.team.slice(0, 21)).join(', '));
+  console.log('  Their working method is unassessed, not zero. Ask them to run');
+  console.log('  collect-history and push, then pull and run this again.');
+}
+
 const thin = clean.filter((r) => r.members === 1);
 if (thin.length && clean.some((r) => r.members > 1)) {
   console.log('\n  Only one person\u2019s evidence for ' + thin.length + ' team(s): '
@@ -379,8 +486,9 @@ console.log('');
 // One trimmed file per team, for the judging pass. Written by default rather than behind
 // a flag: a facilitator who forgets the flag would hand a model a hundred people's
 // committer names and home-directory paths, and forgetting is the normal case.
-if (args.judgingFiles && args.dir && clean.length) {
-  const judgingDir = join(resolve(args.dir), 'judging');
+const judgingParent = args.dir ?? args.repos;
+if (args.judgingFiles && judgingParent && clean.length) {
+  const judgingDir = join(resolve(judgingParent), 'judging');
   try {
     mkdirSync(judgingDir, { recursive: true });
     for (const row of clean) {

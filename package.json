@@ -9,8 +9,9 @@
   },
   "scripts": {
     "test": "node --test \"tests/**/*.test.mjs\"",
-    "check": "npm test && node .github/scripts/kit-check.mjs",
+    "check": "npm test && node .github/scripts/kit-check.mjs && node .github/scripts/build-collector.mjs --check",
     "vibecheck": "node bin/vibecheck.mjs",
-    "leaderboard": "node bin/leaderboard.mjs"
+    "leaderboard": "node bin/leaderboard.mjs",
+    "build:collector": "node .github/scripts/build-collector.mjs"
   }
 }

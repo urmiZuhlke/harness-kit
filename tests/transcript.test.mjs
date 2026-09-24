@@ -46,6 +46,8 @@ async function harvestFrom(root, repoPath) {
   for (const f of readdirSync(join(root, 'proj'))) {
     copyFileSync(join(root, 'proj', f), join(fakeHome, '.claude', 'projects', 'p', f));
   }
+  const realConfigDir = process.env.CLAUDE_CONFIG_DIR;
+  delete process.env.CLAUDE_CONFIG_DIR; // or a developer's relocated sessions leak in
   process.env.HOME = fakeHome;
   process.env.USERPROFILE = fakeHome;
   try {
@@ -53,6 +55,7 @@ async function harvestFrom(root, repoPath) {
   } finally {
     if (realHome === undefined) delete process.env.HOME; else process.env.HOME = realHome;
     if (realProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = realProfile;
+    if (realConfigDir !== undefined) process.env.CLAUDE_CONFIG_DIR = realConfigDir;
   }
 }
 

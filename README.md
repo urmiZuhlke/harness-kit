@@ -17,10 +17,10 @@ repository; the kit is cloned once, separately, and run against it:
 ```bash
 git clone https://github.com/urmiZuhlke/harness-kit.git    # once, anywhere
 cd ~/my-team/booking-app                                    # your own project
-node ~/harness-kit/bin/vibecheck.mjs --team "Team Blue"
+node ~/harness-kit/bin/vibecheck.mjs
 ```
 
-Nothing is installed and there are no dependencies — Node 20+ (22.5+ to read Cursor
+Handing in does not even need the clone — one downloaded file, below. Nothing is installed and there are no dependencies — Node 20+ (22.5+ to read Cursor
 history) and that is all.
 
 ## How the 100 points are decided
@@ -37,32 +37,38 @@ are clearly marked "not scored yet" until then.
 
 ## The process, end to end
 
-**During the event — every team member, on their own laptop, as often as they like:**
+**At hand-in — every team member, once, on the laptop they worked on.** One downloaded file,
+run from the project folder:
 
 ```bash
-node ~/harness-kit/bin/vibecheck.mjs --team "Team Blue"
+curl -fsSLo ~/collect-history.mjs https://raw.githubusercontent.com/urmiZuhlke/harness-kit/main/dist/collect-history.mjs
+node ~/collect-history.mjs
 ```
 
-Everyone on a team types the **same team name** — that is what links their laptops. Each
-run writes `.vibecheck/report.html` (their score and what to do next) and **one file to
-hand in**, whose path it prints. AI chat history lives in each person's home directory, so
-a run on one laptop measures one person: if only one member runs it, the team is scored on
-one person's day and nothing in the output looks wrong.
+No kit clone and no team name — the repository is the team. It reads that person's AI chat
+history for this project and writes `.vibecheck/history-<name>.json`, which they commit and
+push with their work. AI chat history lives in each person's home directory, so a member
+who skips this is invisible to the score; the leaderboard names teams with missing files.
+The file holds counts and short, secret-redacted prompt snippets — never a conversation —
+and `node collect-history.mjs --help` lists exactly what.
 
-**At hand-in:** everyone runs it once more, the team commits `.vibecheck/` and submits
-their repository link as usual. The files travel with the repo — there is nothing extra to
-upload and nowhere to push them.
-
-**Afterwards — a facilitator:** clone each team's repo, copy every `.vibecheck/*.json`
-hand-in file into **one flat folder**, and run one command:
+**Afterwards — a facilitator:** clone every team's repository into one folder (folder name
+= team name) and run one command:
 
 ```bash
-node bin/leaderboard.mjs --dir collected --html leaderboard.html
+node bin/leaderboard.mjs --repos repos --html leaderboard.html
 ```
 
-Files are grouped by the team name inside them, each team's members are merged into one
-score, and every score is recomputed from the evidence — so a team editing their own
-`score.json` changes nothing.
+Each repository and its git history are read, each member's history file is merged in, and
+every score is computed there — so a team editing their own `score.json` changes nothing.
+**No team code is executed**, so twenty repos take seconds on any laptop with Node and
+none of the teams' toolchains.
+
+**During the event, optionally:** teams who clone the kit can run the full self-check,
+`node ~/harness-kit/bin/vibecheck.mjs`, as often as they like. It writes
+`.vibecheck/report.html` — their score and what to do next — and it also runs their test
+suite. (The older hand-in flow, `vibecheck --team "Name"` on each laptop and
+`leaderboard --dir collected`, still works.)
 
 ## For teams
 
@@ -86,17 +92,17 @@ the rubric rewards *your* project's real rules, commands and constraints.
 **3. Check yourself, as often as you like.** From your own project directory:
 
 ```bash
-node ~/harness-kit/bin/vibecheck.mjs --team "Your Team Name"
+node ~/harness-kit/bin/vibecheck.mjs
 ```
 
 It reads your repo, your git history and your AI chat transcripts — locally — and writes
 `.vibecheck/report.html` with your score and what to do next, ranked by what it is worth.
-It also writes **one file to hand in**, and prints its path. See "The process, end to end"
-above; the short version is that everyone on the team runs this with the same team name,
-and you commit `.vibecheck/` so the files travel with your repository.
 
-Transcripts can be read from **Claude Code, GitHub Copilot in VS Code, Codex CLI and
-Cursor**. Anything else is reported as unassessed rather than failed — run `/journal` at
+**4. Hand in.** Every member runs `collect-history.mjs` once and pushes what it writes —
+see "The process, end to end" above.
+
+Transcripts can be read from **Claude Code (CLI, VS Code or JetBrains extension, or the Code tab in Claude Desktop), Codex (CLI, desktop app or VS Code extension), GitHub Copilot in VS Code, and Cursor**. Browser chats (ChatGPT, claude.ai,
+Codex on the web) cannot. Anything else is reported as unassessed rather than failed — run `/journal` at
 milestones as your fallback.
 
 ## For facilitators
@@ -109,19 +115,17 @@ milestones as your fallback.
 - [`docs/acceptance-checklist.template.json`](docs/acceptance-checklist.template.json) —
   write this from your event's brief; it is 5 of the 100 points
 - [`docs/intro-outline.md`](docs/intro-outline.md) — a 30-minute kickoff outline
-- Leaderboard across every team. Collect every file everyone handed in into one flat
-  folder — no subfolders to make, no renaming — and run:
+- Leaderboard across every team. Clone every team's repository into one folder and run:
 
 ```bash
-node bin/leaderboard.mjs --dir collected --html leaderboard.html
+node bin/leaderboard.mjs --repos repos --html leaderboard.html
 ```
 
-Files are grouped by the team name stamped inside them, several members of one team are
-merged into one score automatically, and each score is recomputed from the evidence, so a
-team editing their own `score.json` changes nothing. Your own per-team files go in the
-same folder as `<team-slug>.scorecard.json` and `<team-slug>.judgement.json`.
+Each clone is one team, named after its folder; every member's committed history file is
+merged into it, and no team code is run. Your own per-team files go in the same folder as
+the clones, as `<team-slug>.scorecard.json` and `<team-slug>.judgement.json`.
 
-The run also writes `collected/judging/<team>.json` — one small file per team holding only
+The run also writes `repos/judging/<team>.json` — one small file per team holding only
 the excerpts `/facilitator-judge` reads. Judge from those: they leave out the committer
 names, repository paths, branch names and test output that a judgement does not depend on.
 
