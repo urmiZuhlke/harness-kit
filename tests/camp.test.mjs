@@ -23,7 +23,7 @@ import {
 import { closeCalls, compareEstimates, rankTeams, toCsv, toHtml, toMarkdown } from '../lib/camp/report.mjs';
 import { toReviewHtml } from '../lib/camp/review.mjs';
 import { findDeck, findDiagram, pdfPageCount } from '../lib/camp/submission.mjs';
-import { anonymousSubject, isSystemText, prepareTeam, sample } from '../lib/camp/prepare.mjs';
+import { anonymousSubject, isManualLog, isSystemText, prepareTeam, sample } from '../lib/camp/prepare.mjs';
 
 const KIT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EVENT_RUBRIC = join(KIT_ROOT, 'docs', 'examples', 'zrs-camp-2026', 'evaluation-rubric.md');
@@ -616,6 +616,23 @@ test('text a tool injected as a user turn never reaches the judge as a person\u2
   assert.ok(!all.includes('task-notification') && !all.includes('Update Config Skill'));
   assert.ok(facts.history.correctionExcerpts.includes('no, keep the window'));
   assert.equal(facts.history.systemTextExcerptsDropped, 2);
+});
+
+test('chat logs a team kept by hand are listed for the judge; pipeline artefacts are not', async () => {
+  for (const p of ['.vibecheck/copilot_chats.md', '.vibecheck/chat-export-2026-09-24.txt', 'docs/chatgpt-conversation.md',
+    'notes/prompt-log.md', '.vibecheck/claude.json']) assert.ok(isManualLog(p), p);
+  for (const p of ['.vibecheck/history-ana.json', '.vibecheck/checkpoints/1720ee93.json', 'src/chat/server.js',
+    'docs/architecture.md', 'README.md']) assert.ok(!isManualLog(p), p);
+  const root = scratch();
+  const repo = teamRepo(root, 'team-logs');
+  commit(repo, '2026-09-24T13:00:00Z', 'Ana Anić', 'logs', {
+    '.vibecheck/copilot_chats.md': '# Chat\nUser: plan the booking rules\n',
+    '.vibecheck/runs/abc.json': '{}',
+  });
+  const { facts, preflight } = await prepareTeam(repo, { team: 'team-logs', kitRoot: KIT_ROOT, context: 'Merged two repositories on day 2.' });
+  assert.deepEqual(facts.history.manualLogs.map((l) => l.path), ['.vibecheck/copilot_chats.md']);
+  assert.equal(facts.facilitatorContext, 'Merged two repositories on day 2.');
+  assert.ok(preflight.problems.includes('1 chat log(s) kept by hand as well'));
 });
 
 test('facts stay small enough to read however long a team worked, and the totals still count everything', async () => {

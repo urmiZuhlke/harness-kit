@@ -28,3 +28,6 @@ yarn-error.log*
 # Claude Code: personal overrides and session worktrees
 .claude/settings.local.json
 .claude/worktrees/
+
+# Facilitator notes per team for the camp judges (bin/camp/prepare.mjs --context)
+/team-context/

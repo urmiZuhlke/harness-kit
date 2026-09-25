@@ -48,6 +48,13 @@ Decisions already made (do not reopen them without the facilitators):
 About 11–12 minutes from pull to results for 20 teams, leaving the rest of the 20–30
 minutes for the humans' review of the top three to five in `review.html`.
 
+**Facilitator notes and hand-kept chat logs.** A file `team-context/<team>.md` beside `repos/`
+(git-ignored) is given to that team's judge as trusted context — for example that a team
+merged two repositories, so a late merge commit is not "work done at the end". Chat history a
+team kept by hand (exports or copy-pastes in `.vibecheck/`, or files named chat, conversation,
+transcript or prompt log) is listed for the judge as evidence alongside the collector's
+history files, weighed lower because it is unverified.
+
 **The evening before:**
 
 1. `brew install poppler git-lfs && git lfs install` — poppler lets the judge read decks

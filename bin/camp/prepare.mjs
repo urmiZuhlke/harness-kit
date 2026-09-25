@@ -33,11 +33,13 @@ function help() {
   --rubric  the event's rubric markdown; refused if its areas and sub-criteria do not add up
   --deck    where teams were told to put the deck (default ${DEFAULT_DECK_PATH})
   --team    prepare only this team folder (repeatable), e.g. after re-pulling one repository
+  --context a folder of facilitator notes, one <team>.md each, given to that team's judge as
+            trusted context (default: team-context/ beside the repos folder, if it exists)
 
 Existing score.json files are kept; delete one to have that team judged again.`);
 }
 
-const args = { repos: null, out: null, rubric: null, deck: DEFAULT_DECK_PATH, teams: [] };
+const args = { repos: null, out: null, rubric: null, deck: DEFAULT_DECK_PATH, teams: [], context: null };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -46,6 +48,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--rubric') args.rubric = argv[++i];
   else if (a === '--deck') args.deck = argv[++i];
   else if (a === '--team') args.teams.push(argv[++i]);
+  else if (a === '--context') args.context = argv[++i];
   else if (a === '-h' || a === '--help') { help(); process.exit(0); }
   else { console.error('Unknown argument: ' + a + '\n'); help(); process.exit(1); }
 }
@@ -59,6 +62,14 @@ try { rubric = parseRubric(rubricText); } catch (err) {
 }
 
 const reposDir = resolve(args.repos);
+const contextDir = args.context ? resolve(args.context) : join(dirname(reposDir), 'team-context');
+/** The facilitators' note for one team, or null. Trimmed and bounded: it is context, not a brief. */
+const contextOf = (id, name) => {
+  for (const file of [id + '.md', name + '.md']) {
+    try { return readFileSync(join(contextDir, file), 'utf8').trim().slice(0, 2000) || null; } catch { /* none */ }
+  }
+  return null;
+};
 const outDir = resolve(args.out);
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'rubric.md'), rubricText, 'utf8');
@@ -102,7 +113,7 @@ for (const [id, name] of bySlug) {
   mkdirSync(teamDir, { recursive: true });
   try {
     const { facts, humanNotes, deckFile, diagramFile, diagramCopy, preflight } = await prepareTeam(join(reposDir, name), {
-      team: id, kitRoot: KIT_ROOT, deckPath: args.deck,
+      team: id, kitRoot: KIT_ROOT, deckPath: args.deck, context: contextOf(id, name),
     });
     const factsText = JSON.stringify(facts, null, 1) + '\n';
     const factsPath = join(teamDir, 'facts.json');
