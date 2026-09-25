@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { harvestClaudeCode } from '../lib/harvest/adapters/claude-code.mjs';
 import { harvestCodex, sessionFiles, userRequestOf } from '../lib/harvest/adapters/codex.mjs';
-import { isPlanningTool } from '../lib/harvest/adapters/copilot.mjs';
+import { harvestCopilot, isPlanningTool } from '../lib/harvest/adapters/copilot.mjs';
 import { commandFrom, harvestCursor } from '../lib/harvest/adapters/cursor.mjs';
 import { editorStorageRoots, makeIsInRepo, makeRepoFrom, workspaceFolderOf } from '../lib/harvest/shared.mjs';
 
@@ -214,6 +214,90 @@ test('a folder name in two Unicode forms is the same folder', () => {
   assert.equal(makeRepoFrom(composed)('/Users/a/Zu\u0308hlke/camp'), 'app');
   assert.equal(makeRepoFrom(composed)(composed), null, 'the repo itself is not its own parent');
   assert.equal(makeRepoFrom(composed)('/Users/a/Z\u00fchlke/camp/app/src'), null, 'a folder inside is not a parent');
+});
+
+// --- Copilot's agent event log: VS Code 1.137+ transcripts, Copilot CLI sessions ----------
+//
+// VS Code 1.137 (Sept 2026) stopped writing chatSessions/ and writes GitHub.copilot-chat/
+// transcripts/<id>.jsonl instead; reading only the old place found months-old sessions and
+// none from the camp. The Copilot CLI writes the same records to ~/.copilot/session-state.
+
+const agentEvents = (sessionId, extra = []) => [
+  { type: 'session.start', data: { sessionId, producer: 'copilot-agent' }, id: 'e0', timestamp: '2026-09-24T09:00:00Z' },
+  { type: 'user.message', data: { content: 'Plan the booking rules first, then wait for my ok.', transformedContent: '<wrapped>…' }, id: 'e1', timestamp: '2026-09-24T09:01:00Z' },
+  { type: 'assistant.message', data: { content: 'Plan: …', toolRequests: [{ toolCallId: 't0', name: 'manage_todo_list' }] }, id: 'e2', timestamp: '2026-09-24T09:02:00Z' },
+  { type: 'tool.execution_start', data: { toolCallId: 't0', toolName: 'manage_todo_list', arguments: {} }, id: 'e3', timestamp: '2026-09-24T09:02:01Z' },
+  { type: 'tool.execution_start', data: { toolCallId: 't1', toolName: 'run_in_terminal', arguments: { command: 'npm test' } }, id: 'e4', timestamp: '2026-09-24T09:03:00Z' },
+  { type: 'tool.execution_complete', data: { toolCallId: 't1', success: false, result: { content: '2 failing' } }, id: 'e5', timestamp: '2026-09-24T09:03:30Z' },
+  { type: 'user.message', data: { content: 'No, the check must run inside the transaction.' }, id: 'e6', timestamp: '2026-09-24T09:04:00Z' },
+  { type: 'tool.execution_start', data: { toolCallId: 't2', toolName: 'run_in_terminal', arguments: { command: 'npm test' } }, id: 'e7', timestamp: '2026-09-24T09:05:00Z' },
+  { type: 'tool.execution_complete', data: { toolCallId: 't2', success: true, result: { content: 'all passing' } }, id: 'e8', timestamp: '2026-09-24T09:05:30Z' },
+  ...extra,
+];
+
+/** A VS Code workspace folder for `folder`, under every platform's user-data location. */
+function vscodeWorkspace(home, hash, folder) {
+  const dirs = [];
+  for (const user of [join(home, 'Library', 'Application Support', 'Code', 'User'), join(home, '.config', 'Code', 'User'),
+    join(home, 'AppData', 'Roaming', 'Code', 'User')]) {
+    const dir = join(user, 'workspaceStorage', hash);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'workspace.json'), JSON.stringify({ folder: 'file://' + (folder.startsWith('/') ? '' : '/') + folder.replace(/\\/g, '/') }));
+    dirs.push(dir);
+  }
+  return dirs;
+}
+
+test('VS Code 1.137+ Copilot transcripts are read: prompts, planning, tools and the fail→pass loop', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-copilot-'));
+  for (const dir of vscodeWorkspace(home, 'h1', REPO)) {
+    writeRollout(join(dir, 'GitHub.copilot-chat', 'transcripts'), 'sess-new.jsonl',
+      [...agentEvents('sess-new'), 'not json at all'].map((l) => (typeof l === 'string' ? JSON.parse('"x"') : l)));
+  }
+  await withHome(home, async () => {
+    const r = await harvestCopilot({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.source.status, 'harvested');
+    const s = r.sessions.find((x) => x.sessionId === 'sess-new');
+    assert.ok(s, 'the transcript session is found');
+    assert.equal(s.userPrompts, 2);
+    assert.equal(s.promptLength.max, 'Plan the booking rules first, then wait for my ok.'.length, 'the typed text, not the wrapped form');
+    assert.equal(s.corrections, 1);
+    assert.equal(s.planningSignals, 1);
+    assert.equal(s.commands.test, 2);
+    assert.deepEqual(s.testRuns.map((t) => t.outcome), ['fail', 'pass']);
+    assert.equal(s.startedAt, '2026-09-24T09:00:00.000Z');
+  });
+});
+
+test('Copilot CLI sessions are read when their workspace.yaml names the repo, and only then', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-copilot-'));
+  const state = join(home, '.copilot', 'session-state');
+  writeRollout(join(state, 'cli-ours'), 'events.jsonl', agentEvents('cli-ours'));
+  writeFileSync(join(state, 'cli-ours', 'workspace.yaml'), 'id: cli-ours\ncwd: ' + REPO + '\ngit_root: ' + REPO + '\n');
+  writeRollout(join(state, 'cli-other'), 'events.jsonl', agentEvents('cli-other'));
+  writeFileSync(join(state, 'cli-other', 'workspace.yaml'), 'id: cli-other\ncwd: ' + SIBLING + '\n');
+  await withHome(home, async () => {
+    const r = await harvestCopilot({ isInRepo: makeIsInRepo(REPO) });
+    assert.deepEqual(r.sessions.map((x) => x.sessionId), ['cli-ours']);
+    assert.equal(r.sessions[0].userPrompts, 2);
+  });
+});
+
+test('a transcript of another workspace is not this repo\u2019s, and no Copilot at all says so', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hk-copilot-'));
+  for (const dir of vscodeWorkspace(home, 'h2', SIBLING)) {
+    writeRollout(join(dir, 'GitHub.copilot-chat', 'transcripts'), 'x.jsonl', agentEvents('x'));
+  }
+  await withHome(home, async () => {
+    const r = await harvestCopilot({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.sessions.length, 0);
+    assert.equal(r.source.status, 'empty');
+  });
+  const bare = mkdtempSync(join(tmpdir(), 'hk-copilot-'));
+  await withHome(bare, async () => {
+    const r = await harvestCopilot({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.source.status, 'not-harvested');
+  });
 });
 
 // --- where Codex keeps sessions: the CLI, the desktop app and the IDE extension ------------

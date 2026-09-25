@@ -24,7 +24,7 @@ import { DEFAULT_DECK_PATH, DIAGRAM_PATHS, findDeck, findDiagram } from '../lib/
 const TOOLS = [
   ['claudeCode', 'Claude Code'],
   ['codex', 'Codex'],
-  ['copilot', 'Copilot (VS Code)'],
+  ['copilot', 'Copilot (VS Code/CLI)'],
   ['cursor', 'Cursor'],
 ];
 
@@ -36,7 +36,8 @@ as ${HISTORY_DIR}/history-<your name>.json. Commit and push that file with your 
 
 Reads: Claude Code (CLI, VS Code / JetBrains extension, Code tab in Claude Desktop),
 Codex (CLI, desktop app, VS Code extension — including archived sessions and $CODEX_HOME),
-GitHub Copilot in VS Code, and Cursor. Browser chats (ChatGPT, claude.ai, Codex on the
+GitHub Copilot in VS Code (including the transcripts VS Code 1.137+ writes) and the Copilot
+CLI, and Cursor. Browser chats (ChatGPT, claude.ai, Codex on the
 web) live on a server, not on this laptop, and cannot be read.
 
 What the file contains: per chat session, counts (prompts, tool calls, test runs and
@@ -97,7 +98,7 @@ if (!sessions) {
   console.log(`
 Nothing was found for this folder. Check that:
   - you ran this in the folder you opened in your AI tool (or pass that folder as an argument)
-  - you used Claude Code, Codex (app, extension or CLI), Copilot in VS Code or Cursor on
+  - you used Claude Code, Codex (app, extension or CLI), Copilot (VS Code or CLI) or Cursor on
     this machine (browser chats such as ChatGPT or claude.ai cannot be read)
 Commit the file anyway — it tells us you ran it.`);
 }

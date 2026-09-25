@@ -635,6 +635,22 @@ test('chat logs a team kept by hand are listed for the judge; pipeline artefacts
   assert.ok(preflight.problems.includes('1 chat log(s) kept by hand as well'));
 });
 
+test('--since keeps only sessions from the event; a session with no start time is kept', async () => {
+  const root = scratch();
+  const repo = teamRepo(root, 'team-old-sessions');
+  const at = (id, startedAt) => ({ ...session(id, 'x'), startedAt });
+  commit(repo, '2026-09-24T13:00:00Z', 'Ana Anić', 'history', {
+    '.vibecheck/history-mixed.json': JSON.stringify({ schemaVersion: 3, kind: 'history', member: 'Mixed', repo: { name: 'x' },
+      sources: { claudeCode: { status: 'harvested' } },
+      chat: { claudeCode: [at('april', '2026-04-10T09:00:00Z'), at('camp', '2026-09-24T10:00:00Z'), at('nodate', null)], copilot: [], codex: [], cursor: [] } }),
+  });
+  const { facts, preflight } = await prepareTeam(repo, { team: 'x', kitRoot: KIT_ROOT, since: '2026-09-24' });
+  // teamRepo's own history adds 2 sessions on 2026-09-24; the April one is the only drop.
+  assert.equal(facts.history.sessionsBeforeEventDropped, 1);
+  assert.equal(facts.history.totals.sessions, 4);
+  assert.ok(preflight.problems.includes('1 session(s) from before the event ignored'));
+});
+
 test('facts stay small enough to read however long a team worked, and the totals still count everything', async () => {
   const root = scratch();
   const repo = teamRepo(root, 'team-busy');

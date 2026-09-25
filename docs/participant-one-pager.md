@@ -92,7 +92,7 @@ it finds nothing, it says why. Run it once mid-way too, not only at the deadline
 you find out early that someone's tool can't be read, which is a five-minute problem on
 day one and an unfixable one at the deadline.
 
-**Transcripts can be read from:** Claude Code (CLI, VS Code or JetBrains extension, or the Code tab in Claude Desktop), Codex (CLI, desktop app or VS Code extension), GitHub Copilot in VS Code, and Cursor. Browser chats (ChatGPT, claude.ai,
+**Transcripts can be read from:** Claude Code (CLI, VS Code or JetBrains extension, or the Code tab in Claude Desktop), Codex (CLI, desktop app or VS Code extension), GitHub Copilot in VS Code (both its older chat storage and the transcripts VS Code 1.137+ writes) and the Copilot CLI (`~/.copilot/session-state`, sessions started in this project only), and Cursor. Copilot in JetBrains IDEs is read only where it uses the same session store as the CLI. Browser chats (ChatGPT, claude.ai,
 Codex on the web) cannot. Using something else costs you nothing directly — those criteria come back
 "unassessed" rather than failed, and ranking uses your share of assessable points — but
 you get no feedback on them either, so run `/journal` at milestones. It's your fallback,

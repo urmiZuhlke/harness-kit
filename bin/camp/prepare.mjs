@@ -33,13 +33,14 @@ function help() {
   --rubric  the event's rubric markdown; refused if its areas and sub-criteria do not add up
   --deck    where teams were told to put the deck (default ${DEFAULT_DECK_PATH})
   --team    prepare only this team folder (repeatable), e.g. after re-pulling one repository
+  --since   ignore history sessions that started before this date, e.g. 2026-09-24 (the event's start)
   --context a folder of facilitator notes, one <team>.md each, given to that team's judge as
             trusted context (default: team-context/ beside the repos folder, if it exists)
 
 Existing score.json files are kept; delete one to have that team judged again.`);
 }
 
-const args = { repos: null, out: null, rubric: null, deck: DEFAULT_DECK_PATH, teams: [], context: null };
+const args = { repos: null, out: null, rubric: null, deck: DEFAULT_DECK_PATH, teams: [], context: null, since: null };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -49,6 +50,10 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--deck') args.deck = argv[++i];
   else if (a === '--team') args.teams.push(argv[++i]);
   else if (a === '--context') args.context = argv[++i];
+  else if (a === '--since') {
+    args.since = argv[++i];
+    if (Number.isNaN(Date.parse(args.since ?? ''))) { console.error('--since needs a date, e.g. 2026-09-24'); process.exit(1); }
+  }
   else if (a === '-h' || a === '--help') { help(); process.exit(0); }
   else { console.error('Unknown argument: ' + a + '\n'); help(); process.exit(1); }
 }
@@ -113,7 +118,7 @@ for (const [id, name] of bySlug) {
   mkdirSync(teamDir, { recursive: true });
   try {
     const { facts, humanNotes, deckFile, diagramFile, diagramCopy, preflight } = await prepareTeam(join(reposDir, name), {
-      team: id, kitRoot: KIT_ROOT, deckPath: args.deck, context: contextOf(id, name),
+      team: id, kitRoot: KIT_ROOT, deckPath: args.deck, context: contextOf(id, name), since: args.since,
     });
     const factsText = JSON.stringify(facts, null, 1) + '\n';
     const factsPath = join(teamDir, 'facts.json');
@@ -168,6 +173,7 @@ writeFileSync(manifestPath, JSON.stringify({
     areas: rubric.areas.map((a) => ({ id: a.id, title: a.title, max: a.max })),
   },
   deckPath: args.deck,
+  since: args.since,
   tools: { poppler: hasPoppler },
   teams: [...new Set([...earlierTeams, ...bySlug.keys()])].sort(),
 }, null, 2) + '\n', 'utf8');

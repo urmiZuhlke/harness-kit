@@ -1122,13 +1122,173 @@ async function harvestCodex({ isInRepo, repoFrom = null }) {
 return { sessionFiles, userRequestOf, harvestCodex };
 })();
 
-// ─── lib/harvest/adapters/copilot.mjs ────────────────────────────────────────────────
+// ─── lib/harvest/adapters/copilot-agent.mjs ──────────────────────────────────────────
 const __m4 = (() => {
+const { createReadStream, readFileSync } = __node_fs;
+const { createInterface } = __node_readline;
+const { basename, dirname } = __node_path;
+const { MAX_LINE_BYTES, classifyCommand, classifyOutcome, distribution, excerptCollector, isCorrection } = __m1;
+/**
+ * copilot-agent.mjs — read Copilot's agent event log, the format Copilot moved to in 2026.
+ *
+ * VS Code 1.137 (September 2026) stopped writing chats to `workspaceStorage/<hash>/chatSessions/`
+ * and writes one transcript per session to
+ *   <user-data>/Code/User/workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/<id>.jsonl
+ * The Copilot CLI (and IDE plugins built on the same agent) write the same records to
+ *   ~/.copilot/session-state/<id>/events.jsonl, with the session's folder in workspace.yaml.
+ * Reading only the old location found a person's sessions from months ago and none from the
+ * camp — "it took data from April".
+ *
+ * Every line is `{ type, data, id, parentId, timestamp }`:
+ *   session.start           data.sessionId
+ *   user.message            data.content — what the person typed (transformedContent is
+ *                           the wrapped form sent to the model, and is not the prompt)
+ *   assistant.message       one agent turn
+ *   tool.execution_start    data.toolCallId, data.toolName, data.arguments
+ *   tool.execution_complete data.toolCallId, data.success, data.result
+ * Unknown types are skipped and counted, as in every adapter: the format belongs to someone
+ * else, and a record this reader does not know must not silently become a lower score.
+ */
+
+const PLANNING = /(?:^|[-_/])(?:manage_todo_list|update_todos?|todo_write|todos?|plan(?:ner)?|update_plan)$/i;
+
+/** Plain text from a string, an array of text blocks, or an object carrying one. */
+function textOf(value) {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(textOf).filter(Boolean).join('\n');
+  if (value && typeof value === 'object') {
+    for (const key of ['text', 'content', 'output', 'stdout', 'detailedContent']) {
+      if (value[key] !== undefined) return textOf(value[key]);
+    }
+  }
+  return '';
+}
+
+/** The shell command a tool call ran, whatever the tool calls the argument. */
+function commandOf(args) {
+  if (!args || typeof args !== 'object') return null;
+  for (const key of ['command', 'commandLine', 'cmd', 'script']) {
+    const v = args[key];
+    if (typeof v === 'string' && v.trim()) return v;
+    if (Array.isArray(v)) return v.join(' ');
+  }
+  return null;
+}
+
+/**
+ * The folder a Copilot CLI session ran in, from the workspace.yaml beside its events.
+ * A tiny reader for the two keys needed, not a YAML parser: `cwd:` and `git_root:`.
+ */
+function sessionFolders(eventsFile) {
+  try {
+    const yaml = readFileSync(dirname(eventsFile) + '/workspace.yaml', 'utf8');
+    const out = [];
+    for (const key of ['cwd', 'git_root']) {
+      const m = yaml.match(new RegExp('^' + key + ':\\s*(.+?)\\s*$', 'm'));
+      if (m) out.push(m[1].replace(/^["']|["']$/g, ''));
+    }
+    return out;
+  } catch { return []; }
+}
+
+/** One agent-format session, in the shape every adapter returns. Null when it has no prompts. */
+async function readAgentSession(file) {
+  const s = {
+    sessionId: null, startedAt: null, endedAt: null, prompts: 0, promptLengths: [], corrections: 0,
+    assistantTurns: 0, toolCalls: {}, toolIds: new Set(), planning: 0,
+    commands: { test: 0, buildOrLint: 0, destructive: 0, other: 0 }, testRuns: [],
+    pendingTests: new Map(), malformed: 0, oversized: 0, unknownTypes: 0,
+    promptExcerpts: excerptCollector(6), correctionExcerpts: excerptCollector(6),
+  };
+  const rl = createInterface({ input: createReadStream(file, { encoding: 'utf8' }), crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    if (Buffer.byteLength(line, 'utf8') > MAX_LINE_BYTES) { s.oversized++; continue; }
+    let rec;
+    try { rec = JSON.parse(line); } catch { s.malformed++; continue; }
+    const data = rec.data && typeof rec.data === 'object' ? rec.data : {};
+    const t = Date.parse(rec.timestamp ?? '');
+    if (!Number.isNaN(t)) {
+      if (s.startedAt === null || t < s.startedAt) s.startedAt = t;
+      if (s.endedAt === null || t > s.endedAt) s.endedAt = t;
+    }
+    switch (rec.type) {
+      case 'session.start':
+        if (typeof data.sessionId === 'string') s.sessionId = data.sessionId;
+        break;
+      case 'user.message': {
+        const text = textOf(data.content).trim();
+        if (!text) break;
+        s.prompts++;
+        s.promptLengths.push(text.length);
+        s.promptExcerpts.offer(text, { at: rec.timestamp ?? null });
+        if (isCorrection(text)) { s.corrections++; s.correctionExcerpts.offer(text, { at: rec.timestamp ?? null }); }
+        break;
+      }
+      case 'assistant.message':
+        s.assistantTurns++;
+        break;
+      case 'tool.execution_start': {
+        const id = data.toolCallId ?? rec.id;
+        if (id && s.toolIds.has(id)) break;
+        if (id) s.toolIds.add(id);
+        const name = typeof data.toolName === 'string' ? data.toolName : 'tool';
+        s.toolCalls[name] = (s.toolCalls[name] ?? 0) + 1;
+        if (PLANNING.test(name)) s.planning++;
+        const command = commandOf(data.arguments);
+        if (command) {
+          const kinds = classifyCommand(command);
+          for (const kind of kinds) s.commands[kind]++;
+          if (id && kinds.includes('test')) s.pendingTests.set(id, rec.timestamp ?? null);
+        }
+        break;
+      }
+      case 'tool.execution_complete': {
+        const id = data.toolCallId ?? rec.parentId;
+        if (!id || !s.pendingTests.has(id)) break;
+        const at = s.pendingTests.get(id);
+        s.pendingTests.delete(id);
+        const failed = data.success === false ? true : data.success === true ? false : undefined;
+        s.testRuns.push({ outcome: classifyOutcome(textOf(data.result), failed), at });
+        break;
+      }
+      default:
+        if (typeof rec.type !== 'string') s.unknownTypes++;
+    }
+  }
+  if (!s.prompts) return null;
+  return {
+    sessionId: s.sessionId ?? basename(dirname(file)) + '/' + basename(file, '.jsonl'),
+    startedAt: s.startedAt ? new Date(s.startedAt).toISOString() : null,
+    endedAt: s.endedAt ? new Date(s.endedAt).toISOString() : null,
+    durationMinutes: s.startedAt && s.endedAt ? Math.round((s.endedAt - s.startedAt) / 60000) : null,
+    userPrompts: s.prompts,
+    promptLength: distribution(s.promptLengths),
+    corrections: s.corrections,
+    assistantTurns: s.assistantTurns,
+    toolCalls: s.toolCalls,
+    toolCallTotal: Object.values(s.toolCalls).reduce((a, b) => a + b, 0),
+    commands: s.commands,
+    testRuns: s.testRuns,
+    planningSignals: s.planning,
+    partial: s.oversized > 0,
+    oversizedLines: s.oversized,
+    malformedLines: s.malformed,
+    format: 'copilot-agent-events',
+    excerpts: { prompts: s.promptExcerpts.result(), corrections: s.correctionExcerpts.result() },
+  };
+}
+return { sessionFolders, readAgentSession };
+})();
+
+// ─── lib/harvest/adapters/copilot.mjs ────────────────────────────────────────────────
+const __m5 = (() => {
 const { createReadStream, existsSync, readdirSync, statSync } = __node_fs;
 const { createInterface } = __node_readline;
 const { basename, join } = __node_path;
 const { homedir, platform } = __node_os;
 const { MAX_LINE_BYTES, classifyCommand, classifyOutcome, distribution, editorStorageRoots, excerptCollector, isCorrection, source, workspaceFolderOf } = __m1;
+const { readAgentSession, sessionFolders } = __m4;
 /**
  * copilot.mjs — harvest GitHub Copilot Chat sessions for one repo.
  *
@@ -1309,18 +1469,23 @@ async function readSession(file) {
   };
 }
 
+/** Where the Copilot CLI (and IDE plugins on the same agent) keep their sessions. */
+const copilotHome = () => process.env.COPILOT_HOME || join(homedir(), '.copilot');
+
+/**
+ * Copilot sessions for this repo, from every place Copilot has kept them:
+ *   - VS Code before 1.137: workspaceStorage/<hash>/chatSessions/*.jsonl (delta log)
+ *   - VS Code 1.137+:       workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/*.jsonl
+ *   - Copilot CLI / agent:  ~/.copilot/session-state/<id>/events.jsonl (+ workspace.yaml)
+ * All three are read and reported together; finding nothing in one never hides another.
+ */
 async function harvestCopilot({ isInRepo }) {
   const roots = userDataRoots();
-  if (!roots.length) {
-    return {
-      source: source.notHarvested('no VS Code user-data directory found on this machine'),
-      sessions: [],
-    };
-  }
-
-  const files = [];
+  const legacy = [];
+  const agent = [];
   let hashesSeen = 0;
   let hashesMatched = 0;
+  const filesIn = (dir, test) => { try { return readdirSync(dir).filter(test).map((f) => join(dir, f)); } catch { return []; } };
   for (const root of roots) {
     let hashes;
     try { hashes = readdirSync(root); } catch { continue; }
@@ -1331,52 +1496,62 @@ async function harvestCopilot({ isInRepo }) {
       const folder = workspaceFolderOf(dir);
       if (!folder || !isInRepo(folder)) continue;
       hashesMatched++;
-      const sessionDir = join(dir, 'chatSessions');
-      if (!existsSync(sessionDir)) continue;
-      try {
-        for (const file of readdirSync(sessionDir)) {
-          if (file.endsWith('.jsonl')) files.push(join(sessionDir, file));
-        }
-      } catch { /* unreadable session dir — contributes nothing */ }
+      legacy.push(...filesIn(join(dir, 'chatSessions'), (f) => f.endsWith('.jsonl')));
+      for (const ext of ['GitHub.copilot-chat', 'github.copilot-chat']) {
+        agent.push(...filesIn(join(dir, ext, 'transcripts'), (f) => f.endsWith('.jsonl')));
+      }
     }
   }
+  const stateDir = join(copilotHome(), 'session-state');
+  let cliSeen = 0;
+  for (const dir of filesIn(stateDir, () => true)) {
+    const events = join(dir, 'events.jsonl');
+    if (!existsSync(events)) continue;
+    cliSeen++;
+    if (sessionFolders(events).some((folder) => isInRepo(folder))) agent.push(events);
+  }
 
-  if (!hashesMatched) {
+  if (!roots.length && !cliSeen) {
     return {
-      source: source.empty('no VS Code workspace on this machine maps to this repo', { hashesSeen }),
+      source: source.notHarvested('no VS Code user-data directory and no Copilot CLI sessions on this machine'),
       sessions: [],
     };
   }
-  if (!files.length) {
+  const files = [...new Set(agent)].length + legacy.length;
+  if (!files) {
     return {
-      source: source.empty('a VS Code workspace matched but holds no Copilot chat sessions',
-        { hashesSeen, hashesMatched }),
+      source: source.empty(hashesMatched
+        ? 'a VS Code workspace matched but holds no Copilot chat sessions'
+        : 'no VS Code workspace or Copilot CLI session on this machine maps to this repo',
+      { hashesSeen, hashesMatched, cliSessionsSeen: cliSeen }),
       sessions: [],
     };
   }
 
   const sessions = [];
   const failures = [];
-  for (const file of files) {
+  const read = async (file, reader) => {
     try {
-      const session = await readSession(file);
-      if (session.userPrompts > 0) sessions.push(session);
+      const session = await reader(file);
+      if (session && session.userPrompts > 0) sessions.push(session);
     } catch (err) {
       // Lost evidence must be visible, not silently absorbed into a lower score.
       failures.push({ file: basename(file), error: err.message });
     }
-  }
+  };
+  for (const file of legacy) await read(file, readSession);
+  for (const file of new Set(agent)) await read(file, readAgentSession);
   if (!sessions.length) {
     return {
       source: source.empty('Copilot session files exist for this repo but contain no requests',
-        { hashesSeen, hashesMatched, filesScanned: files.length, failures }),
+        { hashesSeen, hashesMatched, filesScanned: files, failures }),
       sessions: [],
     };
   }
   return {
     source: source.harvested({
-      hashesSeen, hashesMatched, filesScanned: files.length,
-      sessionsMatched: sessions.length, failures,
+      hashesSeen, hashesMatched, filesScanned: files, legacyFiles: legacy.length,
+      transcriptFiles: new Set(agent).size, sessionsMatched: sessions.length, failures,
     }),
     sessions,
   };
@@ -1385,7 +1560,7 @@ return { isPlanningTool, harvestCopilot };
 })();
 
 // ─── lib/harvest/adapters/cursor.mjs ─────────────────────────────────────────────────
-const __m5 = (() => {
+const __m6 = (() => {
 const { existsSync, readdirSync, statSync } = __node_fs;
 const { basename, join } = __node_path;
 const { homedir, platform } = __node_os;
@@ -1749,15 +1924,15 @@ return { commandFrom, harvestCursor };
 })();
 
 // ─── lib/harvest/history.mjs ─────────────────────────────────────────────────────────
-const __m6 = (() => {
+const __m7 = (() => {
 const { execFileSync } = __node_child_process;
 const { realpathSync } = __node_fs;
 const { basename, resolve } = __node_path;
 const { userInfo } = __node_os;
 const { harvestClaudeCode } = __m2;
 const { harvestCodex } = __m3;
-const { harvestCopilot } = __m4;
-const { harvestCursor } = __m5;
+const { harvestCopilot } = __m5;
+const { harvestCursor } = __m6;
 const { makeIsInRepo, makeRepoFrom } = __m1;
 /**
  * history.mjs — read one person's AI chat history for one repository.
@@ -1891,7 +2066,7 @@ return { HISTORY_SCHEMA_VERSION, HISTORY_DIR, HISTORY_PREFIX, repoFromMatcher, r
 })();
 
 // ─── lib/camp/submission.mjs ─────────────────────────────────────────────────────────
-const __m7 = (() => {
+const __m8 = (() => {
 const { closeSync, lstatSync, openSync, readdirSync, readFileSync, readSync } = __node_fs;
 const { join, relative } = __node_path;
 const { inflateSync } = __node_zlib;
@@ -2137,8 +2312,8 @@ return { DEFAULT_DECK_PATH, DIAGRAM_PATHS, findDeck, imageFormat, findDiagram, p
 const { execFileSync } = __node_child_process;
 const { mkdirSync, writeFileSync } = __node_fs;
 const { join, relative } = __node_path;
-const { HISTORY_DIR, collectHistory, historyFileName, repoRootOf, whoAmI } = __m6;
-const { DEFAULT_DECK_PATH, DIAGRAM_PATHS, findDeck, findDiagram } = __m7;
+const { HISTORY_DIR, collectHistory, historyFileName, repoRootOf, whoAmI } = __m7;
+const { DEFAULT_DECK_PATH, DIAGRAM_PATHS, findDeck, findDiagram } = __m8;
 /**
  * collect-history — the one thing a participant runs.
  *
@@ -2157,7 +2332,7 @@ const { DEFAULT_DECK_PATH, DIAGRAM_PATHS, findDeck, findDiagram } = __m7;
 const TOOLS = [
   ['claudeCode', 'Claude Code'],
   ['codex', 'Codex'],
-  ['copilot', 'Copilot (VS Code)'],
+  ['copilot', 'Copilot (VS Code/CLI)'],
   ['cursor', 'Cursor'],
 ];
 
@@ -2169,7 +2344,8 @@ as ${HISTORY_DIR}/history-<your name>.json. Commit and push that file with your 
 
 Reads: Claude Code (CLI, VS Code / JetBrains extension, Code tab in Claude Desktop),
 Codex (CLI, desktop app, VS Code extension — including archived sessions and $CODEX_HOME),
-GitHub Copilot in VS Code, and Cursor. Browser chats (ChatGPT, claude.ai, Codex on the
+GitHub Copilot in VS Code (including the transcripts VS Code 1.137+ writes) and the Copilot
+CLI, and Cursor. Browser chats (ChatGPT, claude.ai, Codex on the
 web) live on a server, not on this laptop, and cannot be read.
 
 What the file contains: per chat session, counts (prompts, tool calls, test runs and
@@ -2230,7 +2406,7 @@ if (!sessions) {
   console.log(`
 Nothing was found for this folder. Check that:
   - you ran this in the folder you opened in your AI tool (or pass that folder as an argument)
-  - you used Claude Code, Codex (app, extension or CLI), Copilot in VS Code or Cursor on
+  - you used Claude Code, Codex (app, extension or CLI), Copilot (VS Code or CLI) or Cursor on
     this machine (browser chats such as ChatGPT or claude.ai cannot be read)
 Commit the file anyway — it tells us you ran it.`);
 }
