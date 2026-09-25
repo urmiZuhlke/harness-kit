@@ -33,7 +33,9 @@ The prompt that launched you gives the **eval folder** (absolute path) and the *
    neither costs points; say which you used in `inputs.diagram`.
 5. The team's repository at `facts.repo.path` — read-only, with Read, Glob and Grep.
 
-Do **not** open: `.vibecheck/` in the repository (the facts already summarise it), any
+Do **not** open: `.vibecheck/history-*.json` in the repository (the facts already summarise
+them) — other logs a team kept there or elsewhere (chat exports, journals) are repository
+evidence you may read, under the rubric's rule for teams without history files; any
 other team's folder, `human-notes.json`, or any other file in the eval folder. You have no
 shell, and nothing is ever run: whether the code runs scores nothing — it is judged by
 reading.

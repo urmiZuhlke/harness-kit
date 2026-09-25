@@ -557,6 +557,10 @@ test('a Git LFS pointer, a corrupt PDF, a symlink and the client brief are never
   writeFileSync(join(dir, 'docs', 'Smart Office - client brief.pdf'), pdf(4));
   writeFileSync(join(dir, 'submission', 'sdlc-diagram.pdf'), pdf(1));
   assert.equal(findDeck(dir).status, 'missing', 'the brief and a diagram PDF are not the proposal');
+  // Seen in a real team repository: the camp's own task and specification in the root.
+  writeFileSync(join(dir, 'ZRS_Camp_Project_Task.pdf'), pdf(3));
+  writeFileSync(join(dir, 'ZRS_Camp_Specification.pdf'), pdf(12));
+  assert.equal(findDeck(dir).status, 'missing', 'the handed-out task is not the proposal');
   writeFileSync(join(dir, 'docs', 'AI-SDLC Proposal.pdf'), pdf(9));
   assert.deepEqual([findDeck(dir).status, findDeck(dir).path], ['misplaced', 'docs/AI-SDLC Proposal.pdf'],
     'a deck word wins over "SDLC" in the name');
