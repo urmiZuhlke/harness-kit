@@ -23,7 +23,7 @@ import {
 import { closeCalls, compareEstimates, rankTeams, toCsv, toHtml, toMarkdown } from '../lib/camp/report.mjs';
 import { toReviewHtml } from '../lib/camp/review.mjs';
 import { findDeck, findDiagram, pdfPageCount } from '../lib/camp/submission.mjs';
-import { anonymousSubject, prepareTeam, sample } from '../lib/camp/prepare.mjs';
+import { anonymousSubject, isSystemText, prepareTeam, sample } from '../lib/camp/prepare.mjs';
 
 const KIT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EVENT_RUBRIC = join(KIT_ROOT, 'docs', 'examples', 'zrs-camp-2026', 'evaluation-rubric.md');
@@ -585,6 +585,33 @@ test('an outdated history file is skipped with a reason, and the team is still p
   assert.equal(facts.submission.unreadableHistoryFiles, 1);
   assert.ok(preflight.problems.includes('1 unreadable history file(s)'));
   assert.ok(humanNotes.unreadableHistoryFiles[0].endsWith('history-stefan.json'));
+});
+
+test('text a tool injected as a user turn never reaches the judge as a person\u2019s prompt', async () => {
+  // Found on a real Claude Code transcript: background-task notifications and skill bodies
+  // were counted as prompts and matched the correction patterns.
+  for (const t of ['<task-notification> <task-id>ab12</task-id>', '<system-reminder> …', 'Base directory for this skill: /x',
+    '# Update Config Skill Modify Claude Code configuration', '<command-name>/clear</command-name>']) {
+    assert.ok(isSystemText(t), t);
+  }
+  for (const t of ['no, keep the 14-day window', '# Context for the booking feature — skill level of users',
+    'Actually use the Skill tool for this', 'Plan first and wait for my ok']) {
+    assert.ok(!isSystemText(t), t);
+  }
+  const root = scratch();
+  const repo = teamRepo(root, 'team-bg');
+  const noisy = { ...session('bg-1', 'x'), excerpts: {
+    prompts: { kept: [{ text: 'Plan the booking rules first' }, { text: '<task-notification> <task-id>x</task-id> done' }] },
+    corrections: { kept: [{ text: '# Update Config Skill Modify settings. Actually do not …' }, { text: 'no, keep the window' }] } } };
+  commit(repo, '2026-09-24T13:00:00Z', 'Ana Anić', 'history', {
+    '.vibecheck/history-bg.json': JSON.stringify({ schemaVersion: 3, kind: 'history', member: 'Bg', repo: { name: 'team-bg' },
+      sources: { claudeCode: { status: 'harvested' } }, chat: { claudeCode: [noisy], copilot: [], codex: [], cursor: [] } }),
+  });
+  const { facts } = await prepareTeam(repo, { team: 'team-bg', kitRoot: KIT_ROOT });
+  const all = JSON.stringify(facts.history);
+  assert.ok(!all.includes('task-notification') && !all.includes('Update Config Skill'));
+  assert.ok(facts.history.correctionExcerpts.includes('no, keep the window'));
+  assert.equal(facts.history.systemTextExcerptsDropped, 2);
 });
 
 test('facts stay small enough to read however long a team worked, and the totals still count everything', async () => {

@@ -108,6 +108,22 @@ your call either — a human decides what it means.
   there is no proposal. (`lfs-pointer` / `not-a-pdf` never reach you — prepare stops
   them.) `facts.submission.diagram.status` works the same way for the diagram image,
   except that `missing` means "use the deck's diagram slide".
+- **How far to trust the history numbers.** Tool calls, sessions, members and timestamps
+  are exact. The rest is read by pattern on the participant's laptop and can be wrong:
+  - *Test runs* are counted only for standard runners (`npm test`, `pytest`, `jest`,
+    `vitest`, `mvn test`, `dotnet test`, `go test`, …). A team whose agent ran
+    `node --test`, `make test` or a custom script shows 0 test runs and 0 fail→pass loops
+    although it tested. Before concluding "no tests were run", check the repository's test
+    files and its test command (`facts.repoFacts.commands.test`) and the commit log.
+  - *Corrections* are matched by wording ("no, …", "that's not what I meant", "revert");
+    judge redirection from what the excerpts actually say, not from the count.
+  - *Planning* counts only planning tools; a plan asked for in plain words ("make a plan
+    and wait for my ok") shows only in the excerpts.
+  - *Prompt counts and lengths* may include text a tool injected as a user turn;
+    `facts.history.systemTextExcerptsDropped` says how many such excerpts were removed
+    before you. Session length, prompt count and prompt length are never quality by
+    themselves: a structured specification followed by planning and verification is good
+    work, many "continue" / "fix it" prompts are not.
 - **Lists in facts are samples when long**: `history.sessions`, `promptExcerpts` and
   `correctionExcerpts` are evenly sampled across the whole period; the `*Total` / `totals`
   fields count everything. Judge volume from the totals, not the length of a list.
