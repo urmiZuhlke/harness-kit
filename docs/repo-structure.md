@@ -6,9 +6,10 @@ Reference for anyone changing the kit. To just use it, read the
 ```
 harness-kit/
 ├── README.md                          ← what this is, for teams and for facilitators
-├── .claude/                           ← facilitator-only, used in this repo: /camp-evaluate
+├── .claude/                           ← facilitator-only, used in this repo: /camp-evaluate, /camp-final
 │   ├── skills/camp-evaluate/          ← one judge per team in parallel, then the results table
-│   └── agents/                        ← camp-judge · camp-calibrator
+│   ├── skills/camp-final/             ← the top five side by side: a second opinion, no score change
+│   └── agents/                        ← camp-judge · camp-calibrator · camp-finalist
 ├── bin/
 │   ├── collect-history.mjs            ← participant hand-in: writes .vibecheck/history-<me>.json
 │   ├── vibecheck.mjs                  ← self-check; --team writes the older hand-in file

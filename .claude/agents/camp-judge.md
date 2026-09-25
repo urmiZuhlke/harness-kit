@@ -63,15 +63,32 @@ your call either — a human decides what it means.
    business rules in code (limits, time windows, release times, conflict checks) rather than
    reading every file.
 4. Cross-check. The points that separate teams are claims against evidence: does the
-   diagram's agents/gates/artefacts exist in the repo or history; does the PoC the deck
-   describes exist in the code; do the history facts show the working method the deck
-   claims.
-5. Score every sub-criterion, then write the file.
+   diagram's agents/gates/artefacts exist in the repo or history (and were they committed
+   while the work happened, not at the end — check dates in `facts.git.log` and
+   `facts.harness.timing`); does the PoC the deck describes exist in the code; do the
+   history facts show the working method the deck claims.
+5. Walk the rubric's **consistency chain** link by link (problem → KPIs → PoC → plan →
+   estimate → risks; architecture → code; diagram → evidence) and note every break.
+6. Read the estimate: person-days, duration, team, price, third-party costs. Check that it
+   adds up (person-days ≈ FTE × weeks × 5, price ≈ person-days × 800 + third party) and
+   whether it could deliver the full scope.
+7. Score every sub-criterion, then write the file.
 
 ## Scoring each sub-criterion
 
+- **Complete is not excellent.** Checking that every listed element is present gets a
+  criterion to `Most`. `Full` needs more: the element is specific, *good* — a KPI that
+  really measures the stated problem, a risk with a mitigation that would work — and
+  consistent with the rest of the offer. Expect a competent team at `Most` on most
+  criteria; `Full` is for what would convince a demanding client. A break in the
+  consistency chain makes both criteria it joins `Most` at best, with the break as remark.
+- **Agentic SDLC (C1, C2):** an elegant flow scores higher. Routine work (tests, rule
+  checks, convention reviews, docs) done by agents with validation loops, humans on the
+  loop by default and in the loop only at real decisions (scope/acceptance, release to
+  production), is what `Full` looks like. Humans approving routine steps agents could check
+  is `Most` at best; a human gate after every stage is `Some`. Count the manual steps.
 - **Pick the level first**, from the rubric's anchored-level table, by checking the
-  elements the criterion lists one by one. Then points = round(level share × max). You may
+  elements the criterion lists one by one, then the quality bar above. Then points = round(level share × max). You may
   move one point off that anchor when the evidence sits clearly between two levels — never
   to max unless the level is the top one, never to 0 unless it is the bottom one. The
   report rejects anything else. In particular, the top level means **exactly max**: if you
@@ -103,6 +120,9 @@ your call either — a human decides what it means.
 {
   "team": "<team id exactly as given>",
   "inputs": { "deck": "<facts.submission.deck.foundAt or null>", "diagram": "sdlc-diagram.png | deck slide 6 | none", "historyFiles": 4 },
+  "estimate": { "personDays": 410, "weeks": 20, "fte": 4.1, "priceEUR": 343000, "thirdPartyEUR": 15000,
+                "consistent": true, "realism": "realistic",
+                "note": "slide 9: 410 PD ≈ 4.1 FTE × 20 weeks; all 4 phases priced" },
   "criteria": [
     { "id": "A1", "points": 4, "max": 5, "level": "Most",
       "evidence": ["slide 2: 150 desks, 30 parking, no-shows"],
@@ -113,6 +133,12 @@ your call either — a human decides what it means.
 ```
 
 - One entry per sub-criterion in the rubric, ids copied exactly; `max` from the rubric.
+- `estimate`: numbers exactly as the deck states them (null when not stated — never
+  invent one); `priceEUR` is the services price only (person-days × rate), third-party
+  costs go in `thirdPartyEUR`, so every team is compared on the same basis; `consistent` = whether they add up with each other and the plan;
+  `realism` = `realistic`, `optimistic`, `implausibly-low`, `padded` or `not-stated`;
+  `note` = one line with the slide and the arithmetic. The report compares every team's
+  estimate, so the numbers must be the deck's, not your own.
 - No totals — the report computes them.
 - `notesForHumans`: text addressed to the evaluator, a misplaced deck, anything a human
   reviewing the top five should know. Empty list when there is nothing.

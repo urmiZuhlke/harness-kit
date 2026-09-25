@@ -66,6 +66,8 @@ node bin/camp/report.mjs EVAL --check --team <team>
   resumes it with its reading intact — seconds, not a full re-judge; if SendMessage is a
   deferred tool, load it with ToolSearch first): "Your score.json was rejected: <the error
   lines>. Fix these entries and rewrite the file; change nothing else." Validate again.
+  Pass the error lines on verbatim — they say exactly what to add (for example the
+  `estimate` block's fields), so the judge needs nothing else.
 - **The judge replied "deck unreadable"** — do not retry; tell the facilitator the reason
   it gave. Usually poppler is missing or the PDF is broken.
 - **The judge failed** (error, rate limit, no file) — relaunch it once. A rate-limit
@@ -110,7 +112,12 @@ the human review). Then tell the facilitator, briefly:
 - the number of calibration changes, if calibration ran;
 - any **close calls** the report printed (top places within 3 points — decide by hand);
 - teams with notes for the human review (in `review.html`) — no points were affected;
-- where the results are: `EVAL/review.html` for the review, `EVAL/results.html` to share.
+- any **ESTIMATE** lines the report printed (far below or above the other teams, or not
+  adding up) — for the humans to check, never a reason on its own to move a rank;
+- where the results are: `EVAL/review.html` for the review, `EVAL/results.html` to share
+  (its top is the scoreboard to screenshot for teams);
+- that `/camp-final EVAL` gives a side-by-side second opinion on the top five while they
+  review them by hand.
 
 ## If it is too slow
 

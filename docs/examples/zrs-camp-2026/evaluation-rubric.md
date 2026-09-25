@@ -24,14 +24,30 @@ brief calls most important, the Agentic SDLC, evidence the deck cannot fake.
 ## How every sub-criterion is scored
 
 Each sub-criterion is worth 3–8 points and scored on **anchored levels**, never on
-impression:
+impression. **Complete is not excellent**: a deck that ticks every listed element earns
+`Most`; `Full` is kept for work that also holds together and would convince a demanding
+client — so a team that polishes its deck against this list does not reach the ceiling,
+and the best teams stay distinguishable from the merely complete ones.
 
 | Level | Awarded when | Share of max |
 | ----- | ------------ | -----------: |
-| Full | every element listed is present **and specific to this client** | 100% |
-| Most | one element missing, or present but generic | ~75% |
+| Full | every element present, specific to this client, **and consistent with the rest of the offer and the evidence** (see the chain below) — the standard of a strong professional bid, with nothing a client's reviewer would push back on | 100% |
+| Most | every element present and specific, but with one weakness a reviewer would point out: shallow reasoning, a broken link in the chain, or one element missing or generic | ~75% |
 | Some | several elements missing, or mostly generic | ~40% |
 | None | absent, or pure boilerplate | 0% |
+
+**The consistency chain.** The judge checks these links; where one breaks, the criteria at
+both ends are `Most` at best, and the remark names the break:
+
+1. The problem (A1) → the KPIs (A2): every KPI measures part of the problem the offer names.
+2. The KPIs and risks → the PoC (D1): the PoC tests the assumption behind the most important
+   KPI or the biggest named risk, not merely the easiest feature.
+3. The PoC → the plan (B2, F1): the delivery plan uses what the PoC learned.
+4. The plan → the estimate (F2): person-days ≈ team × duration; every phase is priced; the
+   price follows from the person-days.
+5. The architecture (E1) → the PoC code (D2): the PoC follows it, or says why not.
+6. The diagram (C1, C2) → the evidence (C5, C6): the agents, gates and artefacts exist.
+7. The risks (F3) → the plan: each top risk has a mitigation somewhere in the plan.
 
 Round to whole points. **Every awarded point cites its evidence** (slide number, file path,
 history metric). A sub-criterion scored below max **must** carry a one-line remark saying
@@ -68,7 +84,7 @@ hybrid work with uneven demand and unused bookings, one office now and multiple 
 | ID | Pts | Full marks when |
 | -- | --: | --------------- |
 | C1 | 4 | The PoC SDLC diagram shows stages, agents and their responsibilities, human responsibilities, input/output artefacts, and review/feedback points, and makes human-in-the-loop vs on-the-loop explicit. (G) |
-| C2 | 4 | Agent responsibilities are meaningful — a designed workflow with handoffs, context/tools and validation loops, not a copy of the org chart — and human decision gates sit where decisions actually are. (G, D) |
+| C2 | 4 | The workflow is **designed to remove bottlenecks**, not a copy of the org chart: agents with handoffs, context/tools and validation loops do the routine work (tests, rule checks, reviews against conventions, docs); humans are **on the loop by default** and **in the loop only at real decisions** (scope and acceptance, release to production), each gate naming who decides and why. Humans approving routine steps agents could check is **Most** at best; a human gate after every stage is **Some**. (G, D) |
 | C3 | 4 | The target SDLC for full delivery evolves credibly: CI/CD with build/test/security checks, separated environments, human approval for production, operation and maintenance, agent permissions and audit (the spec's NFR-11 to NFR-13). (D) |
 
 *Application (13) — whether the evidence shows it happened:*
@@ -110,7 +126,7 @@ the history shows, not about the facilitators executing anything.
 | ID | Pts | Full marks when |
 | -- | --: | --------------- |
 | F1 | 3 | Roadmap and team: phases, milestones, roles, governance and client involvement. |
-| F2 | 4 | The investment is stated and makes sense: total price (person-days at EUR 800) and duration, relevant third-party costs (cloud, licences, AI tooling), and an effort that is **realistic for the full scope** rather than the PoC — enough people and time for the phases and roles the plan names. An estimate that shows where it saves cost (phasing, reuse, AI-assisted delivery) while staying realistic is the strongest. |
+| F2 | 4 | The investment is stated and makes sense: total price (person-days at EUR 800) and duration, relevant third-party costs (cloud, licences, AI tooling), and an effort that is **realistic for the full scope** rather than the PoC — enough people and time for the phases and roles the plan names, consistent with them (chain link 4). **Full** also needs it to be **efficient**: it shows where it saves effort (phasing, reuse, AI-assisted delivery) without cutting scope. Realistic but padded, or efficient without saying how, is **Most**. |
 | F3 | 3 | Risks and assumptions are specific, each with a mitigation, and a concrete recommended next step closes the offer. |
 
 ---
@@ -120,6 +136,13 @@ offer and the best one costs points: a KPI needs its baseline, business value ne
 number, and a committed credential costs two of E3's three points. A score of "Most" costs
 only one point on most sub-criteria, so without this two strong teams tie on criteria where
 one of them is clearly better.
+
+**Value for money across teams.** Each judge records the estimate's numbers (person-days,
+weeks, team, price, third-party costs) in its scorecard, and the report lines every team up
+against the median: an estimate far below its peers is flagged as implausibly low for the
+human review — never rewarded — and one far above as possibly padded. Between two realistic
+offers for the same scope, the faster and cheaper one is the better value; the optional
+final round (`/camp-final`) weighs exactly that when it compares the top teams.
 
 **F2 is not a price competition.** A cheaper offer earns more only when the saving is
 explained and the effort can still deliver the scope; a figure too low to deliver it (a few

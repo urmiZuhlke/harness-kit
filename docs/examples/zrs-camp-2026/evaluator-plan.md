@@ -15,6 +15,19 @@ Decisions already made (do not reopen them without the facilitators):
 - **No calibration pass by default.** One judge per team, then a script merges the
   scorecards into one table; the humans' top-five review is the sanity check.
   `/camp-evaluate eval/ --calibrate` adds the comparison pass (≈ 3–5 min) if wanted.
+- **Complete is not excellent.** A deck that ticks every listed element earns `Most`;
+  `Full` needs it to hold together (the rubric's consistency chain) and convince a
+  demanding client — so teams that polish against the rubric do not all reach 90–100.
+- **An elegant agentic SDLC scores higher**: routine work automated, humans on the loop by
+  default and in the loop only at real decisions.
+- **Value for money is compared across teams**: judges record each estimate's numbers, the
+  report flags estimates far below or above the median; between realistic offers, faster
+  and cheaper is better value.
+- **A final round, off the critical path**: `/camp-final eval/` compares the top five side
+  by side while the facilitators review them by hand — a second opinion with reasons,
+  changing no score.
+- **The shareable page** (`results.html`) starts with a scoreboard naming each area in
+  full — the part to screenshot for teams.
 - **Nothing is run, and running does not count.** Neither the judge nor the facilitators
   execute a team's application or tests; whether it runs influences no score.
 - **No manual scoring.** All twenty teams get points; humans then review the top three to
@@ -30,6 +43,7 @@ Decisions already made (do not reopen them without the facilitators):
 | 2. Prepare | `node bin/camp/prepare.mjs --repos repos/ --out eval/ --rubric docs/examples/zrs-camp-2026/evaluation-rubric.md` — deterministic facts per team, and a pre-flight table of missing files. **Read its `!!` lines**: an unreadable deck (Git LFS pointer, corrupt PDF) or a deck over 20 MB without poppler must be fixed before judging | < 1 min |
 | 3. Judge | In Claude Code, in this repo: `/camp-evaluate eval/` — one judge per team, 8 at a time (add `--calibrate` for the optional comparison pass) | ≈ 9 min |
 | 4. Report | `node bin/camp/report.mjs eval/` — a script, no AI: validates every scorecard, computes totals, writes `results.html` / `.md` / `.csv` (shareable) and **`review.html`** (facilitators only: every team side by side, evidence, links to the files, notes for the human review, **close calls** within 3 points). The skill runs it for you. A team that cannot be judged in time: `--exclude <team>` publishes the rest and says so | seconds |
+| 5. Final round (optional, in parallel with the human review) | `/camp-final eval/` — one agent reads the top five side by side and writes `eval/final-round.md`: its recommended order, pair-by-pair reasons, value for money, agentic SDLC, anything that looks off. Changes no score | 5–8 min |
 
 About 11–12 minutes from pull to results for 20 teams, leaving the rest of the 20–30
 minutes for the humans' review of the top three to five in `review.html`.
@@ -197,6 +211,16 @@ first time** — alpha 98 · delta 90 · bravo 57 · charlie 18. Delta lost the 
 wording intends (A2 no baselines, A3 not quantified, E3 capped by its committed secret);
 the gap from 1st to 2nd grew from 5–7 to 8 points. Nineteen teams at 8 judges at a time
 is three waves: about 7 minutes of judging.
+
+Run after "complete is not excellent", the consistency chain, the agentic-SDLC wording and
+the estimate record (25 Sep): alpha 95 · delta 86 · bravo 53 · charlie 18, judging 1.9 min.
+The gap from 1st to 2nd is 9 points; alpha got 18 of 23 criteria at `Full`, delta 11,
+bravo 1. Judges now name routine human approvals in C2 and estimates that do not add up
+with their own plan (bravo: 320 PD for a team whose plan implies ~650). A missing
+`estimate` block is rejected by the validator with the exact fields to add, and a judge
+fixes it on the retry in about 30 s. `/camp-final` on the four teams took 2.3 min, agreed
+with the points order, and added what humans need to confirm it: the deciding differences,
+what the cheaper offer leaves unpriced, and one alpha claim its tests do not back.
 
 ## Risks and how they are covered
 

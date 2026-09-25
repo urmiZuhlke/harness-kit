@@ -19,7 +19,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { join, resolve } from 'node:path';
 import { parseRubric } from '../../lib/camp/rubric.mjs';
 import { applyCalibration, validateScorecard } from '../../lib/camp/scorecard.mjs';
-import { closeCalls, rankTeams, toCsv, toHtml, toMarkdown } from '../../lib/camp/report.mjs';
+import { closeCalls, compareEstimates, rankTeams, toCsv, toHtml, toMarkdown } from '../../lib/camp/report.mjs';
 import { toReviewHtml } from '../../lib/camp/review.mjs';
 
 function help() {
@@ -153,6 +153,10 @@ const options = { applied: calibrated.applied, generatedAt: new Date().toISOStri
 writeFileSync(join(dir, 'results.md'), toMarkdown(rows, rubric, options), 'utf8');
 writeFileSync(join(dir, 'results.csv'), toCsv(rows, rubric, options), 'utf8');
 writeFileSync(join(dir, 'results.html'), toHtml(rows, rubric, options), 'utf8');
-writeFileSync(join(dir, 'review.html'), toReviewHtml(rows, rubric, { ...options, evalDir: dir, facts }), 'utf8');
+const estimates = compareEstimates(rows);
+writeFileSync(join(dir, 'review.html'), toReviewHtml(rows, rubric, { ...options, evalDir: dir, facts, estimates }), 'utf8');
+// The final round (/camp-final) reads the same comparison rather than recomputing it.
+writeFileSync(join(dir, 'estimates.json'), JSON.stringify(estimates, null, 1) + '\n', 'utf8');
+for (const t of estimates.teams.filter((x) => x.flags.length)) console.log('  ESTIMATE ' + t.team + ': ' + t.flags.join('; '));
 console.log('\n  Wrote results.md, results.csv, results.html (shareable) and review.html (facilitators only)');
 console.log('  in ' + dir + '\n');

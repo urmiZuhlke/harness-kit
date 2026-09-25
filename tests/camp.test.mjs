@@ -20,7 +20,7 @@ import { parseRubric } from '../lib/camp/rubric.mjs';
 import {
   applyCalibration, levelAnchor, totalsOf, validateScorecard,
 } from '../lib/camp/scorecard.mjs';
-import { closeCalls, rankTeams, toCsv, toHtml, toMarkdown } from '../lib/camp/report.mjs';
+import { closeCalls, compareEstimates, rankTeams, toCsv, toHtml, toMarkdown } from '../lib/camp/report.mjs';
 import { toReviewHtml } from '../lib/camp/review.mjs';
 import { findDeck, findDiagram, pdfPageCount } from '../lib/camp/submission.mjs';
 import { anonymousSubject, prepareTeam, sample } from '../lib/camp/prepare.mjs';
@@ -74,6 +74,7 @@ function card(team = 'team-a', over = {}) {
   return {
     team,
     inputs: { deck: 'submission/proposal.pdf', diagram: 'sdlc-diagram.png', historyFiles: 2 },
+    estimate: { personDays: 400, weeks: 20, fte: 4, priceEUR: 330000, thirdPartyEUR: 10000, consistent: true, realism: 'realistic', note: 'slide 9' },
     criteria: Object.entries({ ...base, ...over }).map(([id, c]) => ({ id, max: tiny.criteria.find((x) => x.id === id)?.max, ...c })),
     notesForHumans: [],
   };
@@ -231,6 +232,54 @@ test('close calls flag neighbours in the top five within the margin — includin
   // Ties at 5th are all in the top five, so the comparisons below them still count.
   const tied = [t('a', 90, 1), t('b', 80, 2), t('c', 70, 3), t('d', 60, 4), t('e', 50, 5), t('f', 50, 5), t('g', 49, 7)];
   assert.deepEqual(closeCalls(tied).map((c) => c.a + '-' + c.b), ['e-f', 'f-g']);
+});
+
+// ─── estimates and the shareable scoreboard ──────────────────────────────────────────
+
+const est = (personDays, priceEUR, extra = {}) => ({ personDays, weeks: 20, fte: 4, priceEUR, thirdPartyEUR: 10000,
+  consistent: true, realism: 'realistic', note: 'slide 9', ...extra });
+
+test('every scorecard records the estimate, typed, and a missing one says exactly what to add', () => {
+  assert.deepEqual(validateScorecard({ ...card(), estimate: est(400, 330000) }, tiny, { team: 'team-a' }).errors, []);
+  const { estimate, ...noEstimate } = card();
+  assert.match(validateScorecard(noEstimate, tiny).errors.join(), /estimate is missing — add "estimate": \{ "personDays"/);
+  const notStated = { personDays: null, weeks: null, fte: null, priceEUR: null, thirdPartyEUR: null, consistent: null, realism: 'not-stated', note: 'no estimate in the deck' };
+  assert.deepEqual(validateScorecard({ ...card(), estimate: notStated }, tiny).errors, [], 'a deck with no estimate is recorded as such');
+  const bad = validateScorecard({ ...card(), estimate: { personDays: '400', realism: 'cheap', consistent: 'yes' } }, tiny).errors.join();
+  assert.match(bad, /estimate\.personDays must be a non-negative number or null/);
+  assert.match(bad, /estimate\.realism must be one of/);
+  assert.match(bad, /estimate\.consistent must be/);
+  assert.match(validateScorecard({ ...card(), estimate: 12 }, tiny).errors.join(), /estimate must be an object/);
+});
+
+test('estimates are compared across teams: far below peers is flagged, never rewarded', () => {
+  const rows = rankTeams([
+    { team: 'a', card: { ...card('a'), estimate: est(400, 330000) } },
+    { team: 'b', card: { ...card('b'), estimate: est(420, 346000) } },
+    { team: 'c', card: { ...card('c'), estimate: est(60, 50000, { realism: 'implausibly-low' }) } },
+    { team: 'd', card: { ...card('d'), estimate: est(1100, 890000, { consistent: false }) } },
+    { team: 'e', card: { ...card('e'), estimate: undefined } },
+  ], tiny);
+  const cmp = compareEstimates(rows);
+  assert.equal(cmp.median.personDays, 410);
+  const flags = Object.fromEntries(cmp.teams.map((t) => [t.team, t.flags.join('; ')]));
+  assert.equal(flags.a, '');
+  assert.match(flags.c, /far below peers — check it is realistic/);
+  assert.match(flags.c, /judge: implausibly-low/);
+  assert.match(flags.d, /far above peers — padded\?/);
+  assert.match(flags.d, /does not add up with its own plan/);
+  assert.match(flags.e, /no estimate stated/);
+  const review = toReviewHtml(rows, tiny, { evalDir: '/tmp/eval', facts: new Map(), estimates: cmp });
+  assert.match(review, /Estimates side by side/);
+  assert.match(review, /far below peers/);
+});
+
+test('the shareable scoreboard names each area in full, and never shows notes for humans', () => {
+  const html = toHtml(rankTeams([{ team: 'team-a', card: card('team-a') }], tiny), tiny);
+  const board = html.slice(html.indexOf('<table class="board">'), html.indexOf('</table>'));
+  assert.ok(board.includes('First area') && board.includes('Second area'), 'full area names in the scoreboard');
+  assert.ok(!/>X<small|>Y<small/.test(board), 'no bare area letters in the scoreboard');
+  assert.ok(html.indexOf('<table class="board">') < html.indexOf('Where each team lost points'), 'the scoreboard comes first');
 });
 
 // ─── deck discovery and page counting ────────────────────────────────────────────────

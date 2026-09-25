@@ -37,6 +37,11 @@ submission/sdlc-diagram.png        ← or .jpg
 .vibecheck/history-<name>.json     ← one per member
 ```
 
+**Check it with your AI agent.** Paste the hand-in check prompt (sent with this message;
+[`team-check-prompt.md`](team-check-prompt.md)) into your coding agent in the project
+folder. It checks all of the above and tells you what is missing — it does not create
+the files for you.
+
 **How you are scored.** An AI model (Claude) reads your deck, diagram, repository and
 history files against the published evaluation criteria; facilitators then review the top
 five. **Nobody runs your application** — the code is judged by reading it. Do not commit

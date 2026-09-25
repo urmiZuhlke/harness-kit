@@ -44,6 +44,7 @@ node bin/camp/pull.mjs --list repos.txt --out repos/ [--before "<deadline>"]
 node bin/camp/prepare.mjs --repos repos/ --out eval/ --rubric <event rubric.md>
 /camp-evaluate eval/                        # in Claude Code in this repo: judges + calibration
 node bin/camp/report.mjs eval/              # validate, total, write results.* (shareable) + review.html (facilitators)
+/camp-final eval/                           # optional: the top five side by side → eval/final-round.md
 ```
 
 No dependencies to install — the tests use Node's built-in runner. Node 20+ is required;
