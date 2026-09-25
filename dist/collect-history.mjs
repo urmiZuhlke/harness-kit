@@ -74,7 +74,7 @@ return { SECRET_PATTERNS, redactSecrets };
 // ─── lib/harvest/shared.mjs ──────────────────────────────────────────────────────────
 const __m1 = (() => {
 const { existsSync, readFileSync } = __node_fs;
-const { relative, resolve, isAbsolute, join } = __node_path;
+const { relative, resolve, isAbsolute, join, sep } = __node_path;
 const { fileURLToPath } = __node_url;
 const { redactSecrets } = __m0;
 /**
@@ -364,14 +364,41 @@ const source = {
  * and Windows/POSIX separators and drive-letter case stop mattering.
  */
 function makeIsInRepo(repoPath) {
-  const root = resolve(repoPath);
+  const root = comparable(repoPath);
   return (candidate) => {
     if (typeof candidate !== 'string' || !candidate) return false;
     let rel;
-    try { rel = relative(root, resolve(candidate)); } catch { return false; }
+    try { rel = relative(root, comparable(candidate)); } catch { return false; }
     if (rel === '') return true;
     if (isAbsolute(rel)) return false;
     return !rel.startsWith('..');
+  };
+}
+
+/**
+ * A path in one Unicode form. macOS hands out the same folder name decomposed in one place
+ * and composed in another ("Zühlke" as u + combining diaeresis, or as ü), and a plain string
+ * comparison of the two finds no match — a whole person's history reported as "none belong
+ * to this repo".
+ */
+function comparable(path) {
+  return resolve(path).normalize('NFC');
+}
+
+/**
+ * For a folder that CONTAINS the repository (an IDE workspace opened one level up), the
+ * repository's path relative to it (`camp-repo`), else null. A session started there is not
+ * the repository's by its folder alone — the same workspace can hold other projects — so an
+ * adapter uses this only together with evidence that the session worked inside the repo.
+ */
+function makeRepoFrom(repoPath) {
+  const root = comparable(repoPath);
+  return (candidate) => {
+    if (typeof candidate !== 'string' || !candidate) return null;
+    let rel;
+    try { rel = relative(comparable(candidate), root); } catch { return null; }
+    if (rel === '' || isAbsolute(rel) || rel === '..' || rel.startsWith('..' + sep) || rel.startsWith('../')) return null;
+    return rel.split(sep).join('/');
   };
 }
 
@@ -422,7 +449,7 @@ function workspaceFolderOf(hashDir) {
     return null;
   }
 }
-return { EXCERPT_CHARS, MAX_EXCERPTS, MAX_LINE_BYTES, excerpt, excerptCollector, classifyCommand, stripAnsi, classifyOutcome, isCorrection, distribution, source, makeIsInRepo, editorStorageRoots, workspaceFolderOf };
+return { EXCERPT_CHARS, MAX_EXCERPTS, MAX_LINE_BYTES, excerpt, excerptCollector, classifyCommand, stripAnsi, classifyOutcome, isCorrection, distribution, source, makeIsInRepo, makeRepoFrom, editorStorageRoots, workspaceFolderOf };
 })();
 
 // ─── lib/harvest/adapters/claude-code.mjs ────────────────────────────────────────────
@@ -726,6 +753,12 @@ const { classifyCommand, classifyOutcome, distribution, excerptCollector, isCorr
  * for the same reason: a directory-name slug lies when a session started in a subfolder or
  * through a symlink.
  *
+ * The IDE extension records the folder VS Code has open, which is often the workspace ABOVE
+ * the repository (a camp folder holding the team's clone). Such a session is the repo's
+ * only on evidence it worked there: a request that names a path under the repository, or a
+ * tool call whose working directory is inside it. Open editor tabs in the IDE context are
+ * not evidence — another project's tabs can be open in the same window.
+ *
  * **Written against a moving format, deliberately tolerantly.** Codex has shipped several
  * record layouts: a record may be wrapped in `payload` or flat, a shell call may arrive as
  * `function_call` with JSON `arguments` or as `local_shell_call` with a structured action,
@@ -857,6 +890,42 @@ function resultOf(body) {
   return { text: '', exitCode: null };
 }
 
+/**
+ * What the person actually asked, from a user message.
+ *
+ * Codex injects a setup message (plugin recommendations and environment context) as a user
+ * turn, and the VS Code extension prefixes every request with the IDE context — open tabs,
+ * the active file — ending in `## My request:`. Counted as typed, the first makes a person
+ * look chattier and the second makes every prompt look like a pasted specification, which
+ * is exactly the one-giant-prompt signal the working-method criteria penalise.
+ */
+function userRequestOf(text) {
+  const t = String(text ?? '').trim();
+  if (/^<recommended_plugins>[\s\S]*<\/recommended_plugins>\s*(?:<environment_context>[\s\S]*<\/environment_context>)?$/.test(t)
+    || /^<environment_context>[\s\S]*<\/environment_context>$/.test(t)) return '';
+  const marker = '## My request:';
+  const at = t.lastIndexOf(marker);
+  return at >= 0 ? t.slice(at + marker.length).trim() : t;
+}
+
+/** Every working directory a tool call states, whether its arguments are JSON or source. */
+function workdirsOf(body) {
+  let args = body.arguments ?? body.action ?? body.input ?? null;
+  if (typeof args === 'string') {
+    try { args = JSON.parse(args); } catch {
+      // Some tools record JavaScript source rather than JSON; the workdir is still stated.
+      return [...args.matchAll(/\bworkdir\s*:\s*(["'`])([^"'`]+)\1/g)].map((m) => m[2]);
+    }
+  }
+  return args && typeof args === 'object' && typeof args.workdir === 'string' ? [args.workdir] : [];
+}
+
+/** True when `request` names a path under the repo, as seen from the workspace above it. */
+function namesRepoPath(request, repoRel) {
+  const escaped = repoRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(?:^|[^A-Za-z0-9_.-])' + escaped + '/').test(request.replaceAll('\\', '/').normalize('NFC'));
+}
+
 const CALL_TYPES = new Set([
   'function_call', 'local_shell_call', 'custom_tool_call', 'tool_call', 'shell_call',
 ]);
@@ -865,7 +934,7 @@ const OUTPUT_TYPES = new Set([
   'tool_call_output', 'shell_call_output',
 ]);
 
-async function readSession(file, isInRepo) {
+async function readSession(file, isInRepo, repoFrom) {
   const s = {
     sessionId: null, startedAt: null, endedAt: null,
     userPrompts: 0, promptLengths: [], corrections: 0, assistantTurns: 0, toolCalls: {},
@@ -877,6 +946,9 @@ async function readSession(file, isInRepo) {
   const pending = new Map();
   let cwdSeen = false;
   let belongs = false;
+  // Set when the session started in a folder that contains the repo: the repo's path from
+  // there, until evidence in the session shows it worked on the repo.
+  let repoRel = null;
 
   const rl = createInterface({
     input: createReadStream(file, { encoding: 'utf8' }),
@@ -897,7 +969,8 @@ async function readSession(file, isInRepo) {
       if (typeof cwd === 'string' && cwd) {
         cwdSeen = true;
         belongs = isInRepo(cwd);
-        if (!belongs) { rl.close(); break; }
+        if (!belongs) repoRel = repoFrom?.(cwd) ?? null;
+        if (!belongs && !repoRel) { rl.close(); break; }
       }
     }
     if (!s.sessionId) {
@@ -915,10 +988,21 @@ async function readSession(file, isInRepo) {
 
     const type = body.type ?? rec.type ?? null;
 
+    if (!belongs && repoRel) {
+      if (type === 'message' && body.role === 'user') {
+        belongs = namesRepoPath(userRequestOf(textOf(body.content ?? body.text ?? '')), repoRel);
+      } else if (CALL_TYPES.has(type)) {
+        belongs = workdirsOf(body).some((dir) => isInRepo(dir));
+      }
+    }
+
     if (type === 'message') {
-      const text = textOf(body.content ?? body.text ?? '').trim();
+      const raw = textOf(body.content ?? body.text ?? '').trim();
       if (body.role === 'user') {
-        if (!text) { s.unreadRecords++; continue; }
+        if (!raw) { s.unreadRecords++; continue; }
+        const text = userRequestOf(raw);
+        // An injected setup message is nobody's prompt.
+        if (!text) continue;
         s.userPrompts++;
         s.promptLengths.push(text.length);
         prompts.offer(text, { at: stamp });
@@ -984,7 +1068,7 @@ async function readSession(file, isInRepo) {
   };
 }
 
-async function harvestCodex({ isInRepo }) {
+async function harvestCodex({ isInRepo, repoFrom = null }) {
   const home = codexHome();
   const roots = SESSION_DIRS.map((d) => join(home, d)).filter((d) => existsSync(d));
   if (!roots.length) {
@@ -1015,7 +1099,7 @@ async function harvestCodex({ isInRepo }) {
   const failures = [];
   for (const f of files) {
     try {
-      const s = await readSession(f, isInRepo);
+      const s = await readSession(f, isInRepo, repoFrom);
       if (s) sessions.push(s);
     } catch (err) {
       failures.push({ file: basename(f), error: err.message });
@@ -1035,7 +1119,7 @@ async function harvestCodex({ isInRepo }) {
     sessions,
   };
 }
-return { sessionFiles, harvestCodex };
+return { sessionFiles, userRequestOf, harvestCodex };
 })();
 
 // ─── lib/harvest/adapters/copilot.mjs ────────────────────────────────────────────────
@@ -1674,7 +1758,7 @@ const { harvestClaudeCode } = __m2;
 const { harvestCodex } = __m3;
 const { harvestCopilot } = __m4;
 const { harvestCursor } = __m5;
-const { makeIsInRepo } = __m1;
+const { makeIsInRepo, makeRepoFrom } = __m1;
 /**
  * history.mjs — read one person's AI chat history for one repository.
  *
@@ -1701,6 +1785,23 @@ const HISTORY_PREFIX = 'history-';
  * plain comparison would find nothing and report a team as having no history. So both the
  * root and the recorded path are also compared in their resolved form.
  */
+/**
+ * `makeRepoFrom` for the root in its given and its resolved spelling, and for the recorded
+ * path in both: a workspace opened above a symlinked or case-differing repo still counts.
+ */
+function repoFromMatcher(repo) {
+  const roots = [repo];
+  try { const real = realpathSync.native(repo); if (!roots.includes(real)) roots.push(real); } catch { /* gone */ }
+  const froms = roots.map((root) => makeRepoFrom(root));
+  return (candidate) => {
+    for (const from of froms) { const rel = from(candidate); if (rel) return rel; }
+    let real;
+    try { real = realpathSync.native(candidate); } catch { return null; }
+    for (const from of froms) { const rel = from(real); if (rel) return rel; }
+    return null;
+  };
+}
+
 function repoMatcher(repo) {
   const roots = [resolve(repo)];
   try {
@@ -1723,7 +1824,7 @@ async function harvestChat(repo) {
   const [claudeCode, copilot, codex, cursor] = await Promise.all([
     harvestClaudeCode({ isInRepo }),
     harvestCopilot({ isInRepo }),
-    harvestCodex({ isInRepo }),
+    harvestCodex({ isInRepo, repoFrom: repoFromMatcher(repo) }),
     harvestCursor({ isInRepo }),
   ]);
   return { claudeCode, copilot, codex, cursor };
@@ -1786,7 +1887,7 @@ async function collectHistory(repoPath, { member } = {}) {
     chat: Object.fromEntries(Object.entries(groups).map(([k, g]) => [k, g.sessions])),
   };
 }
-return { HISTORY_SCHEMA_VERSION, HISTORY_DIR, HISTORY_PREFIX, repoMatcher, harvestChat, repoRootOf, whoAmI, slug, historyFileName, collectHistory };
+return { HISTORY_SCHEMA_VERSION, HISTORY_DIR, HISTORY_PREFIX, repoFromMatcher, repoMatcher, harvestChat, repoRootOf, whoAmI, slug, historyFileName, collectHistory };
 })();
 
 // ─── lib/camp/submission.mjs ─────────────────────────────────────────────────────────
@@ -2073,12 +2174,14 @@ web) live on a server, not on this laptop, and cannot be read.
 
 What the file contains: per chat session, counts (prompts, tool calls, test runs and
 whether they passed, corrections, planning steps), timestamps, branch names, and a few
-of your prompts cut to 280 characters (at most 12 per session, plus up to 12 where you
+of your prompts cut to 280 characters (the first 6 per session, plus up to 6 where you
 corrected the AI), with anything that looks like a key or password replaced by
 [redacted]. Never full conversations and never your code. Open the file and read it
 before you commit it — it will be visible to anyone who can see your repository.
 
-Run it from the folder you worked in with your AI tool: sessions are matched by folder.`);
+Run it in the project folder. Sessions are matched by folder; a Codex session started in a
+workspace ABOVE the project also counts when a request names a path inside the project or a
+command ran inside it.`);
 }
 
 const args = process.argv.slice(2);

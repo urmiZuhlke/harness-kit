@@ -41,12 +41,14 @@ web) live on a server, not on this laptop, and cannot be read.
 
 What the file contains: per chat session, counts (prompts, tool calls, test runs and
 whether they passed, corrections, planning steps), timestamps, branch names, and a few
-of your prompts cut to 280 characters (at most 12 per session, plus up to 12 where you
+of your prompts cut to 280 characters (the first 6 per session, plus up to 6 where you
 corrected the AI), with anything that looks like a key or password replaced by
 [redacted]. Never full conversations and never your code. Open the file and read it
 before you commit it — it will be visible to anyone who can see your repository.
 
-Run it from the folder you worked in with your AI tool: sessions are matched by folder.`);
+Run it in the project folder. Sessions are matched by folder; a Codex session started in a
+workspace ABOVE the project also counts when a request names a path inside the project or a
+command ran inside it.`);
 }
 
 const args = process.argv.slice(2);

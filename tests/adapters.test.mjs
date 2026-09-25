@@ -16,10 +16,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { harvestClaudeCode } from '../lib/harvest/adapters/claude-code.mjs';
-import { harvestCodex, sessionFiles } from '../lib/harvest/adapters/codex.mjs';
+import { harvestCodex, sessionFiles, userRequestOf } from '../lib/harvest/adapters/codex.mjs';
 import { isPlanningTool } from '../lib/harvest/adapters/copilot.mjs';
 import { commandFrom, harvestCursor } from '../lib/harvest/adapters/cursor.mjs';
-import { editorStorageRoots, makeIsInRepo, workspaceFolderOf } from '../lib/harvest/shared.mjs';
+import { editorStorageRoots, makeIsInRepo, makeRepoFrom, workspaceFolderOf } from '../lib/harvest/shared.mjs';
 
 // --- Codex ----------------------------------------------------------------------------
 //
@@ -119,6 +119,101 @@ test('a Codex record with the fields at the top level reads the same as a wrappe
     assert.equal(s.sessionId, 'flat-1');
     assert.equal(s.userPrompts, 1);
   });
+});
+
+// --- the IDE extension: a workspace opened above the repository ---------------------------
+//
+// VS Code records the folder it has open. At a camp that is often the folder holding the
+// team's clone, so every session looked like another project's and a person's whole Codex
+// history was reported as "none belong to this repo".
+
+const PARENT = process.platform === 'win32' ? 'C:\\work' : '/work';
+const SIBLING = process.platform === 'win32' ? 'C:\\work\\other' : '/work/other';
+const ideRequest = (request, tabs = ['other/notes.md']) => ({ type: 'response_item', payload: { type: 'message', role: 'user',
+  content: [{ type: 'input_text', text: '# Context from my IDE setup:\n\n## Open tabs:\n' + tabs.map((t) => '- ' + t).join('\n') + '\n\n## My request:\n' + request }] } });
+const setupMessage = { type: 'response_item', payload: { type: 'message', role: 'user',
+  content: [{ type: 'input_text', text: '<recommended_plugins>\n- figma\n</recommended_plugins>\n<environment_context>\n<cwd>' + PARENT + '</cwd>\n</environment_context>' }] } };
+const harvestFor = () => harvestCodex({ isInRepo: makeIsInRepo(REPO), repoFrom: makeRepoFrom(REPO) });
+
+test('a session started in the workspace above the repo counts when a request names a path in it', async () => {
+  const home = codexHome([
+    { type: 'session_meta', payload: { id: 'ide-1', cwd: PARENT } },
+    setupMessage,
+    ideRequest('Look at app/src/booking.js and add the 14-day window check.'),
+    ideRequest('Now run the tests.'),
+  ]);
+  await withHome(home, async () => {
+    const r = await harvestFor();
+    assert.equal(r.sessions.length, 1);
+    const [s] = r.sessions;
+    assert.equal(s.userPrompts, 2, 'the injected setup message is nobody\u2019s prompt');
+    assert.equal(s.promptLength.max, 'Look at app/src/booking.js and add the 14-day window check.'.length,
+      'the IDE context preamble is not part of the prompt');
+    assert.equal(s.excerpts.prompts.kept[0].text, 'Look at app/src/booking.js and add the 14-day window check.');
+  });
+});
+
+test('a tool call running inside the repo is evidence too, as JSON arguments or as source', async () => {
+  const repoDir = REPO;
+  for (const args of [JSON.stringify({ command: ['bash', '-lc', 'npm test'], workdir: repoDir }),
+    'exec_command({ cmd: "npm test", workdir: ' + JSON.stringify(repoDir) + ' })']) {
+    const home = codexHome([
+      { type: 'session_meta', payload: { id: 'ide-2', cwd: PARENT } },
+      ideRequest('run the tests'),
+      { type: 'response_item', payload: { type: 'function_call', name: 'shell', call_id: 'c1', arguments: args } },
+    ]);
+    await withHome(home, async () => {
+      const r = await harvestFor();
+      assert.equal(r.sessions.length, 1, 'workdir inside the repo: ' + args.slice(0, 40));
+      // The command itself is only read from JSON arguments; attribution works for both.
+      if (args.startsWith('{')) assert.equal(r.sessions[0].commands.test, 1);
+    });
+  }
+});
+
+test('a workspace session with no evidence — or about a sibling project — does not count', async () => {
+  const cases = [
+    // The repo only appears in the open tabs: another project's work in the same window.
+    [ideRequest('summarise this document', ['app/README.md'])],
+    // The request and the commands are about a sibling folder.
+    [ideRequest('fix other/src/main.js'),
+      { type: 'response_item', payload: { type: 'function_call', name: 'shell', call_id: 'c1', arguments: JSON.stringify({ command: ['ls'], workdir: SIBLING }) } }],
+    // "app" appears, but not as a path under the workspace.
+    [ideRequest('what does this app do?')],
+  ];
+  for (const lines of cases) {
+    const home = codexHome([{ type: 'session_meta', payload: { cwd: PARENT } }, ...lines]);
+    await withHome(home, async () => {
+      const r = await harvestFor();
+      assert.equal(r.sessions.length, 0);
+      assert.equal(r.source.status, 'empty');
+    });
+  }
+});
+
+test('without the parent matcher a workspace session is still refused, as before', async () => {
+  const home = codexHome([{ type: 'session_meta', payload: { cwd: PARENT } }, ideRequest('edit app/src/x.js')]);
+  await withHome(home, async () => {
+    const r = await harvestCodex({ isInRepo: makeIsInRepo(REPO) });
+    assert.equal(r.sessions.length, 0);
+  });
+});
+
+test('the IDE preamble and the setup message are recognised, and ordinary text is left alone', () => {
+  assert.equal(userRequestOf('# Context from my IDE setup:\n## Open tabs:\n- a.js\n## My request:\nfix it'), 'fix it');
+  assert.equal(userRequestOf(setupMessage.payload.content[0].text), '');
+  assert.equal(userRequestOf('<environment_context><cwd>/x</cwd></environment_context>'), '');
+  assert.equal(userRequestOf('plain request mentioning <environment_context> in passing'), 'plain request mentioning <environment_context> in passing');
+});
+
+test('a folder name in two Unicode forms is the same folder', () => {
+  // macOS returned "Zühlke" decomposed in the session and composed on disk.
+  const composed = '/Users/a/Z\u00fchlke/camp/app';
+  const decomposed = '/Users/a/Zu\u0308hlke/camp/app';
+  assert.ok(makeIsInRepo(composed)(decomposed + '/src'));
+  assert.equal(makeRepoFrom(composed)('/Users/a/Zu\u0308hlke/camp'), 'app');
+  assert.equal(makeRepoFrom(composed)(composed), null, 'the repo itself is not its own parent');
+  assert.equal(makeRepoFrom(composed)('/Users/a/Z\u00fchlke/camp/app/src'), null, 'a folder inside is not a parent');
 });
 
 // --- where Codex keeps sessions: the CLI, the desktop app and the IDE extension ------------

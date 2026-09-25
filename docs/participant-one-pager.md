@@ -117,8 +117,8 @@ before you commit it.
   agent called and how often, how many commands it ran and of what kind (test, build,
   destructive), whether each test run passed or failed, how many times you corrected it,
   and whether you used a planning step.
-- **Also in it:** a few of your prompts, cut to 280 characters — at most 12 per session,
-  plus up to 12 where you corrected the agent — so a facilitator can see *how* you asked
+- **Also in it:** a few of your prompts, cut to 280 characters — the first 6 per session,
+  plus up to 6 where you corrected the agent — so a facilitator can see *how* you asked
   for things. Anything that looks like a key, token or password is replaced by
   `[redacted: …]` before it is written. Anything else you typed into those first 280
   characters is in there as you typed it.
