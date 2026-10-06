@@ -51,6 +51,9 @@ For each finalist, then across them:
 
 ## Write `<eval>/final-round.md`
 
+Markdown only — /camp-final renders it to HTML with everything escaped. Use only headings,
+paragraphs, `-` lists, pipe tables, **bold** and `code`; anything else shows as plain text.
+
 ```markdown
 # Final round — <n> teams compared side by side
 

@@ -22,6 +22,12 @@ from the one agent that launches everything else.
   run `node bin/camp/prepare.mjs --repos <repos> --out <eval> --rubric <rubric.md>` and stop.
 - Team ids: the `teams` list in `EVAL/manifest.json` — not whatever folders exist, since an
   eval folder reused from a rehearsal can hold teams that are not in this run.
+- Check the hand-in was closed: in `EVAL/manifest.json`, either `pull.deadline` is set (prepare
+  has then checked the pull started after it) or `rehearsal` is `true`. If neither, **stop**:
+  the eval was prepared by a kit without that check, possibly on unfinished work — tell the
+  facilitator to pull after the deadline with `--before "<deadline>"` and prepare again. If
+  `rehearsal` is `true`, say once that this run judges clones taken before the hand-in
+  closed and every results page will say REHEARSAL, then carry on.
 - Read `EVAL/preflight.md` (facilitator facts, no team content). **Stop** and tell the
   facilitator what to fix first, then have them re-run prepare, if any team has:
   - a deck `lfs-pointer` / `not-a-pdf`, or a diagram `lfs-pointer` / `not-an-image`

@@ -16,6 +16,11 @@
  * and a credential prompt fails the clone instead of waiting for a keyboard nobody is at.
  * A repository with no commit before the deadline is removed, so it cannot be judged on
  * work pushed after it.
+ *
+ * `.pull.json` records when the pull ran and against which deadline. prepare refuses a pull
+ * without `--before`, or one run before the deadline had passed, unless it is told the run
+ * is a rehearsal: a pull at 12:45 for a 14:00 hand-in once judged every team on unfinished
+ * work, and nothing on the results said so.
  */
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,7 +33,8 @@ function help() {
   --list    one repository per line: "url" or "team-name,url" (# comments allowed)
   --out     folder to clone into; one sub-folder per team, named after the team
   --before  pin every clone to its last commit before this time, e.g. "2026-09-25 14:00"
-            (read in this machine's time zone unless it carries one)
+            (read in this machine's time zone unless it carries one). Without it, or before
+            the deadline has passed, prepare refuses the clones unless given --rehearsal
   --jobs    parallel clones (default 8)`);
 }
 
@@ -112,9 +118,14 @@ async function pullOne({ team, url }, outDir) {
   const checkout = await git(['checkout', '--quiet', '--force', '--detach', target.out], dir);
   if (!checkout.ok) return { team, url, status: 'failed', why: checkout.why };
   const when = await git(['log', '-1', '--format=%cI', target.out], dir);
-  // Work only the default branch is read from: say so when another branch has newer
-  // commits (before the deadline), and when submodules were not fetched.
+  // Work only the default branch is read from: say so when it has commits after the
+  // deadline, when another branch has newer commits (before it), and when submodules were
+  // not fetched.
   const notes = [];
+  if (deadline) {
+    const late = await git(['rev-list', '--count', '--first-parent', target.out + '..' + ref], dir);
+    if (Number(late.out) > 0) notes.push(late.out + ' commit(s) on the default branch after the deadline — not seen');
+  }
   const refs = await git(['for-each-ref', '--format=%(committerdate:iso-strict)%09%(refname:short)', 'refs/remotes/origin'], dir);
   for (const line of refs.out.split('\n').filter(Boolean)) {
     const [date, ref] = line.split('\t');
@@ -154,11 +165,16 @@ for (const r of results) {
 // Every team that was expected, and which ones could not be pulled. prepare reads this so a
 // team whose clone failed is carried into the manifest — and the report refuses to publish
 // until it is pulled or explicitly --exclude'd — instead of silently not existing.
+// pulledAt is when fetching started: a push that lands while the pull runs may be missed.
 writeFileSync(join(outDir, '.pull.json'), JSON.stringify({
-  pulledAt: new Date().toISOString(), deadline,
+  pulledAt: new Date(started).toISOString(), deadline,
   teams: results.map((r) => r.team),
   failed: results.filter((r) => r.status === 'failed').map((r) => ({ team: r.team, why: r.why })),
 }, null, 2) + '\n', 'utf8');
+
+const early = !deadline ? 'No --before: these are the default branches as of now, not the hand-in.'
+  : started < Date.parse(deadline) ? 'The deadline ' + deadline + ' has not passed — teams can still push.' : null;
+if (early) console.log('\n  !! ' + early + '\n  !! prepare refuses these clones unless given --rehearsal; for the real run, pull again after the deadline with --before.');
 
 const failed = results.filter((r) => r.status === 'failed');
 if (failed.length) {

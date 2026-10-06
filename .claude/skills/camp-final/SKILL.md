@@ -1,6 +1,6 @@
 ---
 name: camp-final
-description: "Facilitator only. After /camp-evaluate has written the results, compare the top teams side by side with one camp-finalist agent and write final-round.md — an independent ranked order with reasons, run while the facilitators review the top five by hand. Changes no score."
+description: "Facilitator only. After /camp-evaluate has written the results, compare the top teams side by side with one camp-finalist agent and write final-round.html — an independent ranked order with reasons, run while the facilitators review the top five by hand. Changes no score."
 disable-model-invocation: true
 argument-hint: "<eval folder, e.g. eval/> [--top 5]"
 ---
@@ -28,10 +28,16 @@ score and no scorecard.
 
    Tell the facilitators it is running (typically 5–8 minutes) and that they can review the
    top teams in `EVAL/review.html` meanwhile.
-4. When it finishes, check that `EVAL/final-round.md` exists and tell the facilitators, in
-   three lines: the recommended order, whether it agrees with the points order (and where
-   not), and that the file is `EVAL/final-round.md`. Do not summarise its reasons further —
-   they read it themselves.
+4. When it finishes, check that `EVAL/final-round.md` exists, then render the page
+   facilitators open (the agent writes Markdown only, so no team text becomes live markup):
+
+   ```bash
+   node bin/camp/final-round.mjs EVAL
+   ```
+
+   Tell the facilitators, in three lines: the recommended order, whether it agrees with the
+   points order (and where not), and that the page is `EVAL/final-round.html`. Do not
+   summarise its reasons further — they read it themselves.
 
 If the agent type is not found, tell the facilitator to restart Claude Code in this
 repository; do not substitute a general-purpose agent.

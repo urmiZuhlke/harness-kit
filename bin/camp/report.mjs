@@ -71,8 +71,11 @@ try { rubric = parseRubric(readFileSync(resolve(args.rubric ?? join(dir, 'rubric
 
 // The manifest lists every team prepare was given, so a team whose preparation failed is
 // reported rather than silently left out of the ranking. Without one, the folders decide.
-let manifestTeams = null;
-try { manifestTeams = loadJson(join(dir, 'manifest.json')).teams ?? null; } catch { /* folders decide */ }
+let manifest = null;
+try { manifest = loadJson(join(dir, 'manifest.json')); } catch { /* folders decide */ }
+const manifestTeams = manifest?.teams ?? null;
+// prepare marks a run on clones taken before the hand-in closed; every page says so.
+const rehearsal = manifest?.rehearsal === true;
 const teams = (manifestTeams ?? readdirSync(dir)
   .filter((name) => { try { return statSync(join(dir, name)).isDirectory(); } catch { return false; } })
   .filter((name) => existsSync(join(dir, name, 'facts.json'))))
@@ -130,6 +133,7 @@ if (errors.length) {
   process.exit(1);
 }
 
+if (rehearsal) console.log('\n  REHEARSAL — prepared from clones pulled before the deadline, or without one. Not the results of the hand-in.');
 const rows = rankTeams(teams.map((team) => ({
   team, card: calibrated.cards.get(team), humanNotes: humanNotes.get(team),
 })), rubric);
@@ -149,7 +153,7 @@ if (args.check) {
   process.exit(0);
 }
 
-const options = { applied: calibrated.applied, generatedAt: new Date().toISOString(), excluded: args.exclude, calls };
+const options = { applied: calibrated.applied, generatedAt: new Date().toISOString(), excluded: args.exclude, calls, rehearsal };
 writeFileSync(join(dir, 'results.md'), toMarkdown(rows, rubric, options), 'utf8');
 writeFileSync(join(dir, 'results.csv'), toCsv(rows, rubric, options), 'utf8');
 writeFileSync(join(dir, 'results.html'), toHtml(rows, rubric, options), 'utf8');

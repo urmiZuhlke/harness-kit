@@ -22,6 +22,7 @@ import {
 } from '../lib/camp/scorecard.mjs';
 import { closeCalls, compareEstimates, rankTeams, toCsv, toHtml, toMarkdown } from '../lib/camp/report.mjs';
 import { toReviewHtml } from '../lib/camp/review.mjs';
+import { finalRoundHtml, markdownToHtml } from '../lib/camp/final.mjs';
 import { findDeck, findDiagram, pdfPageCount } from '../lib/camp/submission.mjs';
 import { anonymousSubject, isManualLog, isSystemText, prepareTeam, sample } from '../lib/camp/prepare.mjs';
 
@@ -31,6 +32,10 @@ const node = (script, args, opts = {}) => spawnSync(process.execPath, [join(KIT_
   { encoding: 'utf8', ...opts });
 
 const scratch = () => realpathSync(mkdtempSync(join(tmpdir(), 'hk-camp-')));
+
+/** What pull.mjs records after a pull that started once the deadline had passed. */
+const handIn = (repos, extra = {}) => writeFileSync(join(repos, '.pull.json'), JSON.stringify({
+  pulledAt: '2026-09-25T12:05:00Z', deadline: '2026-09-25T12:00:00Z', teams: [], failed: [], ...extra }));
 
 /** A small rubric that is not this event's, so the machinery is shown to take any. */
 const TINY_RUBRIC = `# Tiny
@@ -274,6 +279,41 @@ test('estimates are compared across teams: far below peers is flagged, never rew
   assert.match(review, /far below peers/);
 });
 
+test('an estimate that was never stated is not also flagged as not adding up', () => {
+  const none = { personDays: null, weeks: null, fte: null, priceEUR: null, thirdPartyEUR: null, consistent: false, realism: 'not-stated', note: 'no deck' };
+  const rows = rankTeams([
+    { team: 'a', card: { ...card('a'), estimate: est(400, 330000) } },
+    { team: 'b', card: { ...card('b'), estimate: none } },
+  ], tiny);
+  const cmp = compareEstimates(rows);
+  assert.deepEqual(cmp.teams.find((t) => t.team === 'b').flags, ['no estimate stated']);
+  const review = toReviewHtml(rows, tiny, { evalDir: '/tmp/eval', facts: new Map(), estimates: cmp });
+  assert.ok(!review.includes('<b>no</b>'), 'the review does not say an absent estimate fails to add up');
+});
+
+test('the final round page renders the finalist template and lets no team text become markup', () => {
+  const md = [
+    '# Final round — 2 teams compared side by side', '',
+    '**Recommended order:** 1. team-a · 2. team-b',
+    '**Agrees with the points order:** yes', '',
+    '## team-a — 1st', 'Holds together; see `src/booking.ts:12`.',
+    '- KPIs <script>alert(1)</script> with baselines', '- one [link](javascript:alert(1)) left as text', '',
+    '| Team | Person-days | Realistic? |', '| --- | ---: | --- |', '| team-a | 280 | yes \\| lean |', '',
+  ].join('\n');
+  const html = markdownToHtml(md);
+  assert.match(html, /<h1>Final round/);
+  assert.match(html, /<p><b>Recommended order:<\/b> 1\. team-a · 2\. team-b<br><b>Agrees/);
+  assert.match(html, /<code>src\/booking\.ts:12<\/code>/);
+  assert.match(html, /<li>KPIs &lt;script&gt;alert\(1\)&lt;\/script&gt; with baselines<\/li>/);
+  assert.ok(!/<a |href=/.test(html), 'links stay text');
+  assert.match(html, /<th class="n">Person-days<\/th>/);
+  assert.match(html, /<td class="n">280<\/td><td>yes \| lean<\/td>/);
+  const page = finalRoundHtml(md, { rehearsal: true });
+  assert.match(page, /<title>Final Round<\/title>/);
+  assert.match(page, /REHEARSAL/);
+  assert.ok(!finalRoundHtml(md).includes('REHEARSAL'));
+});
+
 test('the shareable scoreboard names each area in full, and never shows notes for humans', () => {
   const html = toHtml(rankTeams([{ team: 'team-a', card: card('team-a') }], tiny), tiny);
   const board = html.slice(html.indexOf('<table class="board">'), html.indexOf('</table>'));
@@ -451,6 +491,7 @@ test('prepare and report run end to end, and report refuses to publish an incomp
   const rubricPath = join(root, 'rubric.md');
   writeFileSync(rubricPath, TINY_RUBRIC);
   const evalDir = join(root, 'eval');
+  handIn(repos);
 
   const prep = node('bin/camp/prepare.mjs', ['--repos', repos, '--out', evalDir, '--rubric', rubricPath]);
   assert.equal(prep.status, 0, prep.stderr);
@@ -464,6 +505,8 @@ test('prepare and report run end to end, and report refuses to publish an incomp
   const manifest = JSON.parse(readFileSync(join(evalDir, 'manifest.json'), 'utf8'));
   assert.deepEqual(manifest.teams, ['team-alpha', 'team-bravo']);
   assert.equal(manifest.rubric.total, 10);
+  assert.deepEqual(manifest.pull, { pulledAt: '2026-09-25T12:05:00Z', deadline: '2026-09-25T12:00:00Z' });
+  assert.equal(manifest.rehearsal, false);
 
   // Only one team scored: nothing may be written.
   writeFileSync(join(evalDir, 'team-alpha', 'score.json'), JSON.stringify(card('team-alpha')));
@@ -622,6 +665,7 @@ test('chat logs a team kept by hand are listed for the judge; pipeline artefacts
   for (const p of ['.vibecheck/copilot_chats.md', '.vibecheck/chat-export-2026-09-24.txt', 'docs/chatgpt-conversation.md',
     'notes/prompt-log.md', '.vibecheck/claude.json']) assert.ok(isManualLog(p), p);
   for (const p of ['.vibecheck/history-ana.json', '.vibecheck/checkpoints/1720ee93.json', 'src/chat/server.js',
+    '.github/copilot-instructions.md', '.github/chatmodes/review.chatmode.md', 'AGENTS.md',
     'docs/architecture.md', 'README.md']) assert.ok(!isManualLog(p), p);
   const root = scratch();
   const repo = teamRepo(root, 'team-logs');
@@ -699,6 +743,7 @@ test('a scorecard judged against old facts is moved aside when the repository ch
   const rubricPath = join(root, 'rubric.md');
   writeFileSync(rubricPath, TINY_RUBRIC);
   const evalDir = join(root, 'eval');
+  handIn(repos);
   const prep = () => node('bin/camp/prepare.mjs', ['--repos', repos, '--out', evalDir, '--rubric', rubricPath]);
   assert.equal(prep().status, 0);
   writeFileSync(join(evalDir, 'team-alpha', 'score.json'), JSON.stringify(card('team-alpha')));
@@ -717,8 +762,7 @@ test('prepare carries teams pull could not clone, skips non-repositories, and st
   teamRepo(repos, 'team-alpha');
   mkdirSync(join(repos, 'judging'));
   writeFileSync(join(repos, 'judging', 'team-alpha.json'), '{}');
-  writeFileSync(join(repos, '.pull.json'), JSON.stringify({ teams: ['team-alpha', 'team-gone'],
-    failed: [{ team: 'team-gone', why: 'repository not found' }] }));
+  handIn(repos, { teams: ['team-alpha', 'team-gone'], failed: [{ team: 'team-gone', why: 'repository not found' }] });
   const rubricPath = join(root, 'rubric.md');
   writeFileSync(rubricPath, TINY_RUBRIC);
   const evalDir = join(root, 'eval');
@@ -733,7 +777,7 @@ test('prepare carries teams pull could not clone, skips non-repositories, and st
   assert.equal(node('bin/camp/report.mjs', [evalDir, '--exclude', 'team-gone']).status, 0);
 
   // An LFS-pointer diagram stops the run instead of being judged.
-  rmSync(join(repos, '.pull.json'));
+  handIn(repos);
   const lfsRepo = join(repos, 'team-alpha');
   commit(lfsRepo, '2026-09-24T13:40:00Z', 'Ana Anić', 'diagram', {
     'submission/sdlc-diagram.png': 'version https://git-lfs.github.com/spec/v1\noid sha256:x\n',
@@ -742,6 +786,48 @@ test('prepare carries teams pull could not clone, skips non-repositories, and st
   assert.equal(r.status, 2);
   assert.match(r.stdout, /DIAGRAM IS A GIT LFS POINTER/);
   assert.ok(!existsSync(join(evalDir, 'team-alpha', 'sdlc-diagram.png')), 'the pointer is never copied for the judge');
+});
+
+test('prepare refuses clones taken before the hand-in closed, unless told it is a rehearsal', () => {
+  const root = scratch();
+  const repos = join(root, 'repos');
+  teamRepo(repos, 'team-alpha');
+  const rubricPath = join(root, 'rubric.md');
+  writeFileSync(rubricPath, TINY_RUBRIC);
+  const evalDir = join(root, 'eval');
+  const prep = (...extra) => node('bin/camp/prepare.mjs', ['--repos', repos, '--out', evalDir, '--rubric', rubricPath, ...extra]);
+
+  let r = prep();
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /not pulled with bin\/camp\/pull\.mjs/);
+  handIn(repos, { deadline: null });
+  r = prep();
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /pulled without --before/);
+  handIn(repos, { pulledAt: '2026-09-25T10:45:00Z', deadline: '2026-09-25T12:00:00Z' });
+  r = prep();
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /pulled at 2026-09-25T10:45:00Z, before the deadline 2026-09-25T12:00:00Z — teams could still push/);
+  assert.ok(!existsSync(evalDir), 'nothing is written for a refused pull');
+
+  r = prep('--rehearsal');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /REHEARSAL/);
+  assert.equal(JSON.parse(readFileSync(join(evalDir, 'manifest.json'), 'utf8')).rehearsal, true);
+  assert.match(readFileSync(join(evalDir, 'preflight.md'), 'utf8'), /\*\*REHEARSAL\*\*/);
+  writeFileSync(join(evalDir, 'team-alpha', 'score.json'), JSON.stringify(card('team-alpha')));
+  r = node('bin/camp/report.mjs', [evalDir]);
+  assert.equal(r.status, 0, r.stderr);
+  for (const f of ['results.md', 'results.html', 'review.html']) {
+    assert.match(readFileSync(join(evalDir, f), 'utf8'), /REHEARSAL — judged from clones taken before the hand-in closed/, f);
+  }
+
+  // Pulled again after the deadline: a real run, and the pages no longer say rehearsal.
+  handIn(repos);
+  assert.equal(prep().status, 0);
+  assert.equal(JSON.parse(readFileSync(join(evalDir, 'manifest.json'), 'utf8')).rehearsal, false);
+  node('bin/camp/report.mjs', [evalDir]);
+  assert.ok(!readFileSync(join(evalDir, 'results.html'), 'utf8').includes('REHEARSAL'));
 });
 
 // ─── pull and the participant's pre-flight ───────────────────────────────────────────
@@ -760,6 +846,18 @@ test('pull clones in parallel, pins to the deadline, and names what failed', () 
   assert.match(r.stdout, /1 FAILED: missing/);
   const head = execFileSync('git', ['log', '-1', '--format=%s'], { cwd: join(root, 'repos', 'team-alpha'), encoding: 'utf8' });
   assert.equal(head.trim(), 'on time');
+  assert.match(r.stdout, /1 commit\(s\) on the default branch after the deadline — not seen/);
+  const record = JSON.parse(readFileSync(join(root, 'repos', '.pull.json'), 'utf8'));
+  assert.equal(record.deadline, '2026-09-25T12:00:00.000Z');
+  assert.ok(Date.parse(record.pulledAt) >= Date.parse(record.deadline));
+
+  // Without --before, or before the deadline has passed, pull says prepare will refuse it.
+  writeFileSync(join(root, 'repos.txt'), 'Team Alpha,' + src + '\n');
+  let early = node('bin/camp/pull.mjs', ['--list', join(root, 'repos.txt'), '--out', join(root, 'repos')]);
+  assert.equal(early.status, 0, early.stderr);
+  assert.match(early.stdout, /!! No --before: these are the default branches as of now/);
+  early = node('bin/camp/pull.mjs', ['--list', join(root, 'repos.txt'), '--out', join(root, 'repos'), '--before', '2999-01-01T00:00:00Z']);
+  assert.match(early.stdout, /!! The deadline 2999-01-01T00:00:00.000Z has not passed — teams can still push/);
 });
 
 test('pull removes a clone with nothing before the deadline, follows a corrected URL, and never checks out symlinks', () => {

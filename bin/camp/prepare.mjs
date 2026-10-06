@@ -12,6 +12,10 @@
  * copy, and prints a pre-flight table of what is missing.
  *
  * Nothing from a team repository is executed.
+ *
+ * Refuses, before writing anything, repositories that were not pulled after the deadline
+ * (see `.pull.json` from pull.mjs) unless `--rehearsal` says this is a dry run — which the
+ * manifest records and every results page then shows.
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -36,11 +40,13 @@ function help() {
   --since   ignore history sessions that started before this date, e.g. 2026-09-24 (the event's start)
   --context a folder of facilitator notes, one <team>.md each, given to that team's judge as
             trusted context (default: team-context/ beside the repos folder, if it exists)
+  --rehearsal  prepare clones pulled without --before, or before the deadline passed — a dry
+            run on unfinished work; the results then say REHEARSAL on every page
 
 Existing score.json files are kept; delete one to have that team judged again.`);
 }
 
-const args = { repos: null, out: null, rubric: null, deck: DEFAULT_DECK_PATH, teams: [], context: null, since: null };
+const args = { repos: null, out: null, rubric: null, deck: DEFAULT_DECK_PATH, teams: [], context: null, since: null, rehearsal: false };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -50,6 +56,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--deck') args.deck = argv[++i];
   else if (a === '--team') args.teams.push(argv[++i]);
   else if (a === '--context') args.context = argv[++i];
+  else if (a === '--rehearsal') args.rehearsal = true;
   else if (a === '--since') {
     args.since = argv[++i];
     if (Number.isNaN(Date.parse(args.since ?? ''))) { console.error('--since needs a date, e.g. 2026-09-24'); process.exit(1); }
@@ -67,6 +74,24 @@ try { rubric = parseRubric(rubricText); } catch (err) {
 }
 
 const reposDir = resolve(args.repos);
+
+// What pull.mjs recorded: when it ran, against which deadline, and which teams it could not
+// clone. Judging clones taken before the hand-in closed scores unfinished work, and the
+// results look exactly like real ones — so that needs --rehearsal, said out loud.
+let pulled = null;
+try { pulled = JSON.parse(readFileSync(join(reposDir, '.pull.json'), 'utf8')); } catch { /* not from pull.mjs */ }
+const pullProblem = !pulled ? 'these repositories were not pulled with bin/camp/pull.mjs, so nothing records when, or against which deadline'
+  : !pulled.deadline ? 'these repositories were pulled without --before: they are the default branches as of ' + pulled.pulledAt + ', not the hand-in'
+  : !(Date.parse(pulled.pulledAt) >= Date.parse(pulled.deadline)) ? 'these repositories were pulled at ' + pulled.pulledAt
+    + ', before the deadline ' + pulled.deadline + ' — teams could still push'
+  : null;
+if (pullProblem && !args.rehearsal) {
+  console.error('Not prepared: ' + pullProblem + '.\n'
+    + '  For the real run, once the deadline has passed:  node bin/camp/pull.mjs --list repos.txt --out ' + args.repos + ' --before "<deadline>"\n'
+    + '  For a dry run on what is there now, add --rehearsal: the results then say REHEARSAL on every page.');
+  process.exit(2);
+}
+if (pullProblem) console.log('REHEARSAL — ' + pullProblem + '.');
 const contextDir = args.context ? resolve(args.context) : join(dirname(reposDir), 'team-context');
 /** The facilitators' note for one team, or null. Trimmed and bounded: it is context, not a brief. */
 const contextOf = (id, name) => {
@@ -92,8 +117,6 @@ const teams = readdirSync(reposDir)
 if (notRepos.length) console.log('Not a team (no .git), skipped: ' + notRepos.join(', '));
 
 // Teams pull expected but could not clone: carried as failed rows so they stay visible.
-let pulled = null;
-try { pulled = JSON.parse(readFileSync(join(reposDir, '.pull.json'), 'utf8')); } catch { /* not from pull.mjs */ }
 const notPulled = (pulled?.failed ?? [])
   .filter((f) => !teams.includes(f.team) && (!args.teams.length || args.teams.includes(f.team)));
 if (!teams.length && !notPulled.length) { console.error('No team repositories in ' + reposDir); process.exit(1); }
@@ -174,6 +197,8 @@ writeFileSync(manifestPath, JSON.stringify({
   },
   deckPath: args.deck,
   since: args.since,
+  pull: pulled ? { pulledAt: pulled.pulledAt ?? null, deadline: pulled.deadline ?? null } : null,
+  rehearsal: Boolean(pullProblem),
   tools: { poppler: hasPoppler },
   teams: [...new Set([...earlierTeams, ...bySlug.keys()])].sort(),
 }, null, 2) + '\n', 'utf8');
@@ -184,7 +209,8 @@ const table = [
   ...rows.map((r) => '| ' + [r.team, r.deck, r.pages ?? '—', r.megabytes ?? '—', r.diagram, r.historyFiles, r.gitAuthors ?? '—',
     r.commits ?? '—', r.testFiles, r.problems.join('; ') || 'none'].join(' | ') + ' |'),
 ];
-writeFileSync(join(outDir, 'preflight.md'), '# Pre-flight\n\n' + table.join('\n') + '\n', 'utf8');
+writeFileSync(join(outDir, 'preflight.md'), '# Pre-flight\n\n'
+  + (pullProblem ? '**REHEARSAL** — ' + pullProblem + '.\n\n' : '') + table.join('\n') + '\n', 'utf8');
 
 console.log('\nPRE-FLIGHT   ' + rows.length + ' team(s), rubric ' + rubric.total + ' points in '
   + rubric.areas.length + ' areas, ' + ((Date.now() - started) / 1000).toFixed(1) + ' s\n');

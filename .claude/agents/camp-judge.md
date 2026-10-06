@@ -167,7 +167,7 @@ your call either — a human decides what it means.
 - One entry per sub-criterion in the rubric, ids copied exactly; `max` from the rubric.
 - `estimate`: numbers exactly as the deck states them (null when not stated — never
   invent one); `priceEUR` is the services price only (person-days × rate), third-party
-  costs go in `thirdPartyEUR`, so every team is compared on the same basis; `consistent` = whether they add up with each other and the plan;
+  costs go in `thirdPartyEUR`, so every team is compared on the same basis; `consistent` = whether they add up with each other and the plan (null when no estimate is stated);
   `realism` = `realistic`, `optimistic`, `implausibly-low`, `padded` or `not-stated`;
   `note` = one line with the slide and the arithmetic. The report compares every team's
   estimate, so the numbers must be the deck's, not your own.

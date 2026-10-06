@@ -40,11 +40,11 @@ node bin/leaderboard.mjs --dir <collected>  # older hand-in: group by team, merg
 node bin/vibecheck.mjs --evidence <file>    # score one existing bundle
 node bin/merge-evidence.mjs --dir <dir> --out <file>   # merge by hand, rarely needed
 # AI-judged event (deck + repo + history against an event rubric) — see docs/examples/zrs-camp-2026/evaluator-plan.md
-node bin/camp/pull.mjs --list repos.txt --out repos/ [--before "<deadline>"]
-node bin/camp/prepare.mjs --repos repos/ --out eval/ --rubric <event rubric.md>
+node bin/camp/pull.mjs --list repos.txt --out repos/ --before "<deadline>"   # after the deadline
+node bin/camp/prepare.mjs --repos repos/ --out eval/ --rubric <event rubric.md> [--rehearsal]
 /camp-evaluate eval/                        # in Claude Code in this repo: judges + calibration
 node bin/camp/report.mjs eval/              # validate, total, write results.* (shareable) + review.html (facilitators)
-/camp-final eval/                           # optional: the top five side by side → eval/final-round.md
+/camp-final eval/                           # optional: the top five side by side → eval/final-round.html
 ```
 
 No dependencies to install — the tests use Node's built-in runner. Node 20+ is required;

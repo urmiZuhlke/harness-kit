@@ -39,11 +39,11 @@ Decisions already made (do not reopen them without the facilitators):
 
 | Step | Command | Time |
 | ---- | ------- | ---: |
-| 1. Pull | `node bin/camp/pull.mjs --list repos.txt --out repos/` — `repos.txt` is the submitted URLs, one per line (optionally `team-name,url`); clones all of them in parallel, re-running updates existing clones, `--before "<deadline>"` pins each to its last commit before the deadline, and it prints which failed | ~2 min |
+| 1. Pull | **After the deadline:** `node bin/camp/pull.mjs --list repos.txt --out repos/ --before "2026-09-25 14:00"` — `repos.txt` is the submitted URLs, one per line (optionally `team-name,url`); clones all of them in parallel, re-running updates existing clones, `--before` pins each to its last commit before the deadline, and it prints which failed and who pushed after the deadline. prepare refuses a pull without `--before` or one started before the deadline; `--rehearsal` allows it for a dry run and marks every results page REHEARSAL | ~2 min |
 | 2. Prepare | `node bin/camp/prepare.mjs --repos repos/ --out eval/ --rubric docs/examples/zrs-camp-2026/evaluation-rubric.md` — deterministic facts per team, and a pre-flight table of missing files. **Read its `!!` lines**: an unreadable deck (Git LFS pointer, corrupt PDF) or a deck over 20 MB without poppler must be fixed before judging | < 1 min |
 | 3. Judge | In Claude Code, in this repo: `/camp-evaluate eval/` — one judge per team, 8 at a time (add `--calibrate` for the optional comparison pass) | ≈ 9 min |
 | 4. Report | `node bin/camp/report.mjs eval/` — a script, no AI: validates every scorecard, computes totals, writes `results.html` / `.md` / `.csv` (shareable) and **`review.html`** (facilitators only: every team side by side, evidence, links to the files, notes for the human review, **close calls** within 3 points). The skill runs it for you. A team that cannot be judged in time: `--exclude <team>` publishes the rest and says so | seconds |
-| 5. Final round (optional, in parallel with the human review) | `/camp-final eval/` — one agent reads the top five side by side and writes `eval/final-round.md`: its recommended order, pair-by-pair reasons, value for money, agentic SDLC, anything that looks off. Changes no score | 5–8 min |
+| 5. Final round (optional, in parallel with the human review) | `/camp-final eval/` — one agent reads the top five side by side and writes `eval/final-round.md`, rendered to **`eval/final-round.html`**: its recommended order, pair-by-pair reasons, value for money, agentic SDLC, anything that looks off. Changes no score | 5–8 min |
 
 About 11–12 minutes from pull to results for 20 teams, leaving the rest of the 20–30
 minutes for the humans' review of the top three to five in `review.html`.
@@ -229,10 +229,22 @@ fixes it on the retry in about 30 s. `/camp-final` on the four teams took 2.3 mi
 with the points order, and added what humans need to confirm it: the deciding differences,
 what the cheaper offer leaves unpriced, and one alpha claim its tests do not back.
 
+## On the day — 25 Sep 2026
+
+The first run judged clones pulled at 12:45 without `--before`, for a 14:00 hand-in. Nine of
+the fourteen repositories had newer commits by 13:15 — three of them a proposal PDF where
+the judges had scored "no deck", so every one of those teams lost areas A, B and F — and
+nothing on the results said the run was early. The judging itself held up on spot checks.
+Fixed in the kit: prepare now refuses clones pulled without a deadline or before it passed
+(`--rehearsal` for a deliberate dry run, which every results page then marks), pull counts
+commits pushed after the deadline, the report no longer flags "does not add up" for an
+estimate that was never stated, and the final round is also written as HTML.
+
 ## Risks and how they are covered
 
 | Risk | Cover |
 | ---- | ----- |
+| Judging before the hand-in closes | prepare refuses a pull without `--before` or started before the deadline; `--rehearsal` makes a dry run explicit on every page |
 | A repo cannot be cloned | `pull.mjs` lists failures in the first two minutes; test access the evening before |
 | A team submitted PPTX only, or the PDF in the wrong place | PPTX-only scores as no proposal (announced up front); a misplaced PDF is found and used with a remark; the pre-flight in `collect-history.mjs` warns teams before 14:00 |
 | Prompt injection in a deck or README | Judge prompt treats team content as data; injection notes go to humans; rehearsal showed no effect on the score |
